@@ -153,6 +153,7 @@ export class MetaService {
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token}` }
     });
+        
     return response.data.data; // Retorna array de plantillas
   }
 

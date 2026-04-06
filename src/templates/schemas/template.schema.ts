@@ -20,10 +20,6 @@ export class Template {
   @Prop({ required: true })
   category: string; // 'MARKETING', 'UTILITY', 'AUTHENTICATION'
 
-  // ==========================================
-  // ESTRUCTURA DESGLOSADA (Para facilitar el Frontend)
-  // ==========================================
-
   @Prop({ default: false })
   hasMedia: boolean; // true si requiere imagen, video o documento
 
@@ -42,10 +38,6 @@ export class Template {
   @Prop({ type: [SchemaTypes.Mixed], default: [] })
   buttons: any[]; // Array con los botones (Quick Replies, URLs dinámicas, etc.)
 
-  // ==========================================
-  // EL TRADUCTOR DE VARIABLES (Tu configuración local)
-  // ==========================================
-
   @Prop({ type: [String], default: [] })
   headerVariablesMapping: string[]; // Si el header es texto y tiene {{1}}, qué variable de tu sistema va ahí
 
@@ -55,12 +47,8 @@ export class Template {
   @Prop({ type: [String], default: [] })
   buttonVariablesMapping: string[]; // Si el botón es un enlace dinámico que termina en {{1}}
 
-  // ==========================================
-  // RESPALDO ORIGINAL
-  // ==========================================
-
   @Prop({ type: SchemaTypes.Mixed })
-  rawComponents: any; // El JSON exacto que devuelve Meta (útil por si en el futuro Meta añade cosas nuevas)
+  rawComponents: any;
 
   @Prop({ default: true })
   active: boolean;

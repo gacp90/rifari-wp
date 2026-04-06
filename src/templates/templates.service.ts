@@ -23,37 +23,84 @@ export class TemplatesService {
     if (!channel) throw new NotFoundException('Canal no encontrado');
 
     try {
-      // 1. Enviamos la petición de creación a la Cloud API de Meta
-      // templateData debe traer name, language, category y components
-      const metaResponse = await this.metaService.registerTemplate(channel.wabaId, templateData);
 
-      // 2. Si Meta responde OK, extraemos la info para nuestro modelo optimizado
-      const headerComponent = templateData.components.find(c => c.type === 'HEADER');
-      const bodyComponent = templateData.components.find(c => c.type === 'BODY');
-      const footerComponent = templateData.components.find(c => c.type === 'FOOTER');
-      const buttonsComponent = templateData.components.find(c => c.type === 'BUTTONS');
+      // 1. EL TRADUCTOR MÁGICO PARA META
+      let metaBodyText = templateData.bodyText;
+      const bodyVariablesMapping: string[] = [];
+      let contador = 1;
 
-      const headerType = headerComponent ? headerComponent.format : 'NONE';
-      const hasMedia = ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerType);
+      // Buscamos {{name}}, {{number}}, etc., y los cambiamos por {{1}}, {{2}}
+      const regex = /\{\{([^}]+)\}\}/g;
+      metaBodyText = metaBodyText.replace(regex, (match, variableNombre) => {
+        bodyVariablesMapping.push(variableNombre); // Guardamos ['name', 'number']
+        return `{{${contador++}}}`; // Retorna {{1}}, {{2}} para el texto de Meta
+      });
 
-      // 3. Guardamos en MongoDB con estado PENDING
+      // 2. CONSTRUIMOS EL ARRAY 'COMPONENTS' ESTRICTO PARA META
+      const components: any[] = [];
+
+      const bodyComponent: any = { type: 'BODY', text: metaBodyText };
+      // INYECTAMOS DIRECTAMENTE LO QUE VINO DEL FRONTEND
+      if (templateData.exampleBodyText && templateData.exampleBodyText.length > 0) {
+        bodyComponent.example = {
+          body_text: templateData.exampleBodyText // Ya viene como [ ["Juan", "015"] ]
+        };
+      }
+
+      components.push(bodyComponent);
+
+      // Header
+      if (templateData.headerType !== 'NONE') {
+        const headerParams: any = { type: 'HEADER', format: templateData.headerType };
+        if (templateData.headerType === 'TEXT') headerParams.text = templateData.headerText;
+        components.push(headerParams);
+      }
+
+      // Footer
+      if (templateData.footerText?.trim()) {
+        components.push({ type: 'FOOTER', text: templateData.footerText.trim() });
+      }
+
+      // Botones
+      if (templateData.quickReplies && templateData.quickReplies.length > 0) {
+        const buttons = templateData.quickReplies.map(texto => ({
+          type: 'QUICK_REPLY',
+          text: texto
+        }));
+        components.push({ type: 'BUTTONS', buttons });
+      }
+
+      // 3. ENVIAMOS A META
+      const metaPayload = {
+        name: templateData.name,
+        language: templateData.language,
+        category: templateData.category,
+        components: components
+      };
+      
+      // Descomenta esto cuando estés listo para hacer la petición real
+      await this.metaService.registerTemplate(channel.wabaId, metaPayload);
+
+      // 4. GUARDAMOS EN NUESTRA BASE DE DATOS LOCAL
+      // Aquí guardamos la versión amigable para que tu software la lea fácil después
       const newTemplate = new this.templateModel({
         internalApiKey: apiKey,
         name: templateData.name,
         language: templateData.language,
         category: templateData.category,
-        status: 'PENDING', // Meta debe aprobarla
-        hasMedia,
-        headerType,
-        headerContent: headerType === 'TEXT' ? headerComponent.text : null,
-        bodyText: bodyComponent ? bodyComponent.text : '',
-        footerText: footerComponent ? footerComponent.text : null,
-        buttons: buttonsComponent ? buttonsComponent.buttons : [],
-        rawComponents: templateData.components, // Guardamos el original por seguridad
-        // Los mapeos se inicializan vacíos para que el usuario los configure luego
-        headerVariablesMapping: [],
-        bodyVariablesMapping: [],
-        buttonVariablesMapping: []
+        status: 'PENDING',
+        hasMedia: ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(templateData.headerType),
+        headerType: templateData.headerType,
+        headerContent: templateData.headerType === 'TEXT' ? templateData.headerText : null,
+        
+        // LA CLAVE: Guardamos el texto original "Hola {{name}}"
+        bodyText: templateData.bodyText, 
+        
+        footerText: templateData.footerText,
+        buttons: templateData.quickReplies || [],
+        
+        // Y guardamos el mapa para cuando hagamos el envío masivo saber el orden exacto
+        bodyVariablesMapping: bodyVariablesMapping 
       });
 
       await newTemplate.save();
@@ -69,53 +116,69 @@ export class TemplatesService {
   // 2. SINCRONIZAR (Actualizar estados desde Meta)
   // ==========================================
   async syncTemplates(apiKey: string) {
+    // 1. Buscamos el canal para obtener el WABA ID
     const channel = await this.channelModel.findOne({ internalApiKey: apiKey });
     if (!channel) throw new NotFoundException('Canal no encontrado');
 
     try {
-      // Pedimos a Meta todas las plantillas de esta cuenta
-      const metaTemplates = await this.metaService.getTemplates(channel.wabaId);
+      // 2. Traemos TODAS las plantillas directamente desde Meta
+      // (Asumiendo que tienes un método getTemplates en tu meta.service)
+      const metaResponse = await this.metaService.getTemplates(channel.wabaId);
+      
+      const metaTemplates = metaResponse; // Array de plantillas de Facebook
 
-      const syncResults = { added: 0, updated: 0 };
+      // 3. Traemos nuestras plantillas locales de Mongo
+      const localTemplates = await this.templateModel.find({ internalApiKey: apiKey });
 
-      // Iteramos sobre lo que devuelve Meta
-      for (const t of metaTemplates) {
-        // Analizamos los componentes
-        const headerComponent = t.components?.find(c => c.type === 'HEADER');
-        const bodyComponent = t.components?.find(c => c.type === 'BODY');
-        const footerComponent = t.components?.find(c => c.type === 'FOOTER');
-        const buttonsComponent = t.components?.find(c => c.type === 'BUTTONS');
+      let plantillasModificadas = 0;
 
-        const headerType = headerComponent ? headerComponent.format : 'NONE';
-        const hasMedia = ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerType);
-
-        const templateData = {
-          status: t.status, // Aquí viene 'APPROVED', 'REJECTED', etc.
-          category: t.category,
-          hasMedia,
-          headerType,
-          headerContent: headerType === 'TEXT' ? headerComponent.text : null,
-          bodyText: bodyComponent ? bodyComponent.text : '',
-          footerText: footerComponent ? footerComponent.text : null,
-          buttons: buttonsComponent ? buttonsComponent.buttons : [],
-          rawComponents: t.components
-        };
-
-        // Upsert: Si existe la actualiza (ej: pasa de PENDING a APPROVED), si no, la crea
-        const result = await this.templateModel.updateOne(
-          { internalApiKey: apiKey, name: t.name, language: t.language },
-          { $set: templateData },
-          { upsert: true }
+      // 4. Comparamos una por una
+      for (const metaTpl of metaTemplates) {
+        // Buscamos si tenemos esta plantilla guardada (coincidiendo nombre e idioma)
+        const localTpl = localTemplates.find(
+          t => t.name === metaTpl.name && t.language === metaTpl.language
         );
 
-        if (result.upsertedCount > 0) syncResults.added++;
-        if (result.modifiedCount > 0) syncResults.updated++;
+        if (localTpl) {
+          let necesitaActualizacion = false;
+          const cambios: any = {};
+
+          // A. ¿Cambió el estado? (ej: de PENDING a APPROVED)
+          if (localTpl.status !== metaTpl.status) {
+            cambios.status = metaTpl.status;
+            necesitaActualizacion = true;
+          }
+
+          // B. LA MAGIA: ¿Meta nos cambió la categoría?
+          if (localTpl.category !== metaTpl.category) {
+            cambios.category = metaTpl.category;
+            necesitaActualizacion = true;
+            this.logger.log(`Categoría actualizada para ${metaTpl.name}: ${localTpl.category} -> ${metaTpl.category}`);
+          }
+
+          // Si detectamos algún cambio, actualizamos en Mongo
+          if (necesitaActualizacion) {
+            await this.templateModel.updateOne(
+              { _id: localTpl._id },
+              { $set: cambios }
+            );
+            plantillasModificadas++;
+          }
+        } 
+        // Nota: Si quieres que las plantillas creadas directamente en el Business Manager 
+        // de Facebook también se guarden en Rifari, podrías agregar un 'else' aquí 
+        // para hacer un 'new this.templateModel(...).save()'.
       }
 
-      return { success: true, message: 'Sincronización completa', details: syncResults };
+      return { 
+        success: true, 
+        message: 'Sincronización completada', 
+        actualizadas: plantillasModificadas 
+      };
+
     } catch (error) {
-      this.logger.error('Error sincronizando plantillas', error);
-      throw new BadRequestException('Fallo al sincronizar con Meta');
+      this.logger.error('Error en la sincronización de plantillas:', error);
+      throw new BadRequestException('No se pudo sincronizar con Meta');
     }
   }
 
@@ -168,6 +231,29 @@ export class TemplatesService {
       this.logger.error('Error en queryTemplates:', error);
       // NestJS maneja las excepciones HTTP de forma limpia
       throw new BadRequestException('Error inesperado al consultar plantillas');
+    }
+  }
+
+  // ==========================================
+  // 6. ACTIVAR O DESACTIVAR PLANTILLAS
+  // ==========================================
+  async toggleTemplateActive(apiKey: string, templateId: string, isActive: boolean) {
+    try {
+      // Usamos el apiKey en el filtro por seguridad, así nadie edita plantillas de otros
+      const updatedTemplate = await this.templateModel.findOneAndUpdate(
+        { _id: templateId, internalApiKey: apiKey },
+        { $set: { active: isActive } },
+        { new: true }
+      );
+
+      if (!updatedTemplate) {
+        throw new NotFoundException('Plantilla no encontrada o no autorizada');
+      }
+
+      return { success: true, active: updatedTemplate.active };
+    } catch (error) {
+      this.logger.error('Error cambiando estado de plantilla:', error);
+      throw new BadRequestException('No se pudo actualizar el estado');
     }
   }
 }

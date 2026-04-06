@@ -85,17 +85,29 @@ export class WhatsappController {
 
         // 2. Llamamos a Meta para poner el check azul
         const success = await this.metaService.markAsRead(
-        channel.phoneNumberId,
+            channel.phoneNumberId,
             body.wamid
         );
 
         if (success) {
-        // 3. Opcional: Actualizamos nuestra propia BD para saber que ya se leyó
-        await this.messageModel.findOneAndUpdate(
-            { wamid: body.wamid },
-            { status: 'read' }
-        );
-        return { success: true };
+            // 3. LA SOLUCIÓN: Buscar el mensaje para saber quién lo envió
+            const mensajeReferencia = await this.messageModel.findOne({ wamid: body.wamid });
+
+            if (mensajeReferencia) {
+                // 4. Limpiar TODOS los mensajes recibidos de ese cliente
+                await this.messageModel.updateMany(
+                    { 
+                        internalApiKey: apiKey,
+                        from: mensajeReferencia.from, // El número del cliente
+                        direction: 'inbound',
+                        status: 'received' 
+                    },
+                    { 
+                        $set: { status: 'read' } 
+                    }
+                );
+            }
+            return { success: true };
         }
 
         return { success: false, message: 'No se pudo marcar como leído en Meta' };
@@ -171,16 +183,16 @@ export class WhatsappController {
             customers: Array<{ phone: string; parameters: string[] }>; 
         }
         ) {
-        const channel = await this.channelModel.findOne({ internalApiKey: apiKey });
-        if (!channel) throw new UnauthorizedException();
+            const channel = await this.channelModel.findOne({ internalApiKey: apiKey });
+            if (!channel) throw new UnauthorizedException();
 
-        // Devolvemos el OK al frontend inmediatamente
-        const responseMsg = `Enviando ${body.customers.length} mensajes en segundo plano.`;
-        
-        // Ejecutamos el loop sin el 'await' para que el usuario no se quede esperando
-        this.processBulkQueue(channel, body);
+            // Devolvemos el OK al frontend inmediatamente
+            const responseMsg = `Enviando ${body.customers.length} mensajes en segundo plano.`;
+            
+            // Ejecutamos el loop sin el 'await' para que el usuario no se quede esperando
+            this.processBulkQueue(channel, body);
 
-        return { success: true, message: responseMsg };
+            return { success: true, message: responseMsg };
         }
 
         private async processBulkQueue(channel: any, body: any) {

@@ -6,6 +6,7 @@ import { Channel, ChannelDocument } from '../whatsapp/schemas/channel.schema';
 import { Message, MessageDocument } from '../whatsapp/schemas/message.schema';
 import { MetaService } from '../meta/meta.service';
 import { ChatGateway } from 'src/chat/chat.gateway';
+import { Template, TemplateDocument } from 'src/templates/schemas/template.schema';
 
 @Injectable()
 export class WebhookService {
@@ -14,31 +15,76 @@ export class WebhookService {
   constructor(
     @InjectModel(Channel.name) private channelModel: Model<ChannelDocument>,
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
+    @InjectModel(Template.name) private templateModel: Model<TemplateDocument>,
     private readonly metaService: MetaService, 
     private readonly chatGateway: ChatGateway,
   ) {}
 
   async processIncomingData(body: any) {
     try {
-      const entry = body.entry?.[0];
-      const changes = entry?.changes?.[0]?.value;
-      
-      if (!changes) return;
+      // Validamos que sea un evento de WhatsApp
+      if (body.object !== 'whatsapp_business_account') return;
 
-      const destinationPhoneId = changes.metadata?.phone_number_id;
-      const channel = await this.channelModel.findOne({ phoneNumberId: destinationPhoneId });
+      const entry = body.entry?.[0];
+      if (!entry) return;
+
+      // Extraemos el WABA ID y el objeto del cambio
+      const wabaId = entry.id; 
+      const changeObject = entry.changes?.[0]; 
       
-      if (!channel) {
-        this.logger.warn(`Mensaje recibido para el número ${destinationPhoneId}, pero no está registrado.`);
-        return;
+      if (!changeObject) return;
+
+      const field = changeObject.field; // Aquí Meta nos dice qué está enviando
+      const value = changeObject.value; // Aquí vienen los datos reales
+
+      // ====================================================
+      // 1. RUTA DE PLANTILLAS (Template Status Update)
+      // ====================================================
+      if (field === 'message_template_status_update') {
+        const templateName = value.message_template_name;
+        const language = value.message_template_language;
+        const newStatus = value.event; // 'APPROVED', 'REJECTED', 'PENDING'
+
+        this.logger.log(`[Webhook] La plantilla '${templateName}' cambió a estado: ${newStatus}`);
+
+        // Buscamos el canal usando el WABA ID (porque las plantillas son de la cuenta)
+        const channel = await this.channelModel.findOne({ wabaId: wabaId });
+
+        if (channel) {
+          // Actualizamos en la base de datos
+          await this.templateModel.updateOne(
+            { internalApiKey: channel.internalApiKey, name: templateName, language: language },
+            { $set: { status: newStatus } }
+          );
+          this.logger.log(`[Webhook] Estado de plantilla actualizado en BD.`);
+        } else {
+          this.logger.warn(`[Webhook] No se encontró canal para el WABA ID: ${wabaId}`);
+        }
+        
+        return; // Terminamos aquí para no ejecutar la lógica de mensajes
       }
 
-      if (changes.messages) {
-        const msg = changes.messages[0];
-        await this.saveIncomingMessage(channel, msg);
-      } else if (changes.statuses) {
-        const statusMsg = changes.statuses[0];
-        await this.updateMessageStatus(statusMsg);
+      // ====================================================
+      // 2. RUTA DE MENSAJES (Tu lógica original intacta)
+      // ====================================================
+      if (field === 'messages') {
+        // En los mensajes, sí viene el ID del teléfono en la metadata
+        const destinationPhoneId = value.metadata?.phone_number_id;
+        
+        const channel = await this.channelModel.findOne({ phoneNumberId: destinationPhoneId });
+        
+        if (!channel) {
+          this.logger.warn(`Mensaje recibido para el número ${destinationPhoneId}, pero no está registrado.`);
+          return;
+        }
+
+        if (value.messages) {
+          const msg = value.messages[0];
+          await this.saveIncomingMessage(channel, msg);
+        } else if (value.statuses) {
+          const statusMsg = value.statuses[0];
+          await this.updateMessageStatus(statusMsg);
+        }
       }
 
     } catch (error) {

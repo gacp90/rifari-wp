@@ -7,7 +7,7 @@ export class MetaController {
 
   // Este es el que probablemente te da error. 
   // Lo actualizamos para recibir el phoneId y los datos del body.
-  @Post('send-template')
+  /* @Post('send-template')
   async sendTemplate(@Body() body: { phoneId: string, to: string }) {
     // Si aún quieres usar la plantilla hello_world por defecto para pruebas:
     // NOTA: Tendríamos que crear un método en el service para templates, 
@@ -18,7 +18,7 @@ export class MetaController {
       body.to, 
       "Prueba de mensaje dinámico"
     );
-  }
+  } */
 
   // Endpoint de prueba rápida
   @Get('test')

@@ -79,7 +79,7 @@ export class TemplatesService {
       };
       
       // Descomenta esto cuando estés listo para hacer la petición real
-      await this.metaService.registerTemplate(channel.wabaId, metaPayload);
+      await this.metaService.registerTemplate(channel.wabaId, metaPayload, channel.access_token);
 
       // 4. GUARDAMOS EN NUESTRA BASE DE DATOS LOCAL
       // Aquí guardamos la versión amigable para que tu software la lea fácil después
@@ -123,7 +123,7 @@ export class TemplatesService {
     try {
       // 2. Traemos TODAS las plantillas directamente desde Meta
       // (Asumiendo que tienes un método getTemplates en tu meta.service)
-      const metaResponse = await this.metaService.getTemplates(channel.wabaId);
+      const metaResponse = await this.metaService.getTemplates(channel.wabaId, channel.access_token);
       
       const metaTemplates = metaResponse; // Array de plantillas de Facebook
 

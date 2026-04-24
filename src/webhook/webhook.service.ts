@@ -104,12 +104,12 @@ export class WebhookService {
         // Generamos el nombre
         const fileName = `${extracted.mediaId}${extension}`;
         
-        const url = await this.metaService.getMediaUrl(extracted.mediaId);
+        const url = await this.metaService.getMediaUrl(extracted.mediaId, channel.access_token);
         // downloadMedia ahora nos devuelve solo el nombre (según el cambio anterior)
-        savedFileName = await this.metaService.downloadMedia(url, fileName);
+        savedFileName = await this.metaService.downloadMedia(url, fileName, channel.access_token);
         
         this.logger.log(`📁 Archivo descargado exitosamente: ${savedFileName}`);
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`Error descargando media: ${error.message}`);
       }
     }

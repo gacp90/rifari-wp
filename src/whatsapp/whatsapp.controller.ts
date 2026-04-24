@@ -45,7 +45,8 @@ export class WhatsappController {
             const result = await this.metaService.sendMessage(
                 channel.phoneNumberId,
                 body.to,
-                body.message
+                body.message,
+                channel.access_token
             );
 
             // Guardamos el mensaje en nuestra base de datos
@@ -88,7 +89,8 @@ export class WhatsappController {
         // 2. Llamamos a Meta para poner el check azul
         const success = await this.metaService.markAsRead(
             channel.phoneNumberId,
-            body.wamid
+            body.wamid,
+            channel.access_token
         );
 
         if (success) {
@@ -122,7 +124,7 @@ export class WhatsappController {
         if (!channel) throw new UnauthorizedException();
 
         // Llamamos a Meta para traer las plantillas
-        return await this.metaService.getTemplates(channel.wabaId);
+        return await this.metaService.getTemplates(channel.wabaId, channel.access_token);
     }
 
     /* ================= SEND TEMPLATE ================= */
@@ -148,6 +150,7 @@ export class WhatsappController {
             body.to,
             body.templateName,
             body.langCode || 'en_US',
+            channel.access_token,
             body.bodyVariables || [],
             body.mediaUrl,
             body.mediaType,
@@ -244,7 +247,8 @@ export class WhatsappController {
                     channel.phoneNumberId,
                     customer.phone,       
                     body.templateName,    
-                    body.langCode || 'en_US',                 
+                    body.langCode || 'en_US', 
+                    channel.access_token, // Pasamos el API Key para que el servicio de Meta pueda cargar las variables desde la base de datos                
                     customer.parameters,  
                     body.mediaUrl,        
                     body.mediaType,       

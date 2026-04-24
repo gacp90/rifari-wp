@@ -12,9 +12,9 @@ export class MetaService {
   constructor(private configService: ConfigService) {}
 
   /* ================= SEND MESSAGE ================= */
-  async sendMessage(phoneId: string, to: string, message: string) {
+  async sendMessage(phoneId: string, to: string, message: string, token: string) {
     // El Token de Usuario del Sistema (System User Token) sigue siendo el tuyo como Partner
-    const token = this.configService.get<string>('META_MASTER_TOKEN');
+    // const token = this.configService.get<string>('META_MASTER_TOKEN');
     const url = `${this.baseUrl}/${phoneId}/messages`;
 
     try {
@@ -43,8 +43,8 @@ export class MetaService {
   }
 
   /* ================= CONFIRM READ ================= */
-  async markAsRead(phoneId: string, wamid: string) {
-    const token = this.configService.get<string>('META_MASTER_TOKEN'); // Tu nombre de variable corregido
+  async markAsRead(phoneId: string, wamid: string, token: string) {
+    //const token = this.configService.get<string>('META_MASTER_TOKEN'); // Tu nombre de variable corregido
     const url = `${this.baseUrl}/${phoneId}/messages`;
 
     try {
@@ -68,8 +68,8 @@ export class MetaService {
 
   /* ================ DESCARGA URL MEDIA =============== */
   // Obtener el URL del archivo desde Meta usando el media_id que viene en el mensaje
-  async getMediaUrl(mediaId: string): Promise<string> {
-    const token = this.configService.get<string>('META_MASTER_TOKEN');
+  async getMediaUrl(mediaId: string, token: string): Promise<string> {
+    // const token = this.configService.get<string>('META_MASTER_TOKEN');
     const url = `https://graph.facebook.com/v21.0/${mediaId}`;
 
     const response = await axios.get(url, {
@@ -80,8 +80,8 @@ export class MetaService {
   }
 
   /* ================= DOWNLOAD ARCHIVE BINARY OF META ================= */
-  async downloadMedia(url: string, fileName: string): Promise<string> {
-    const token = this.configService.get<string>('META_MASTER_TOKEN');
+  async downloadMedia(url: string, fileName: string, token: string): Promise<string> {
+    // const token = this.configService.get<string>('META_MASTER_TOKEN');
     
     // Definimos la ruta local donde se guardará (por ahora una carpeta /uploads)
     const uploadDir = path.join(process.cwd(), 'uploads');
@@ -105,9 +105,9 @@ export class MetaService {
     });
   }
 
-  async registerTemplate(wabaId: string, templateData: any) {
+  async registerTemplate(wabaId: string, templateData: any, token: string) {
     // Tomamos el token de tu archivo de entorno (.env)
-    const token = this.configService.get<string>('META_MASTER_TOKEN');
+    // const token = this.configService.get<string>('META_MASTER_TOKEN');
     
     // Endpoint específico para CREAR plantillas en la cuenta de WhatsApp Business
     const url = `${this.baseUrl}/${wabaId}/message_templates`;
@@ -147,8 +147,8 @@ export class MetaService {
   }
 
   /* ================= LOAD TEMPLATES ================= */
-  async getTemplates(wabaId: string) {
-    const token = this.configService.get<string>('META_MASTER_TOKEN');
+  async getTemplates(wabaId: string, token: string) {
+    //const token = this.configService.get<string>('META_MASTER_TOKEN');
     const url = `${this.baseUrl}/${wabaId}/message_templates`;
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token}` }
@@ -163,12 +163,14 @@ export class MetaService {
       to: string, 
       templateName: string, 
       langCode: string,
+      token: string,
       bodyVariables?: string[], 
       mediaUrl?: string,
       mediaType?: 'image' | 'video' | 'document',
-      buttons?: any[] // <-- NUEVO: Array para los botones dinámicos
+      buttons?: any[]
     ) {
-      const token = this.configService.get<string>('META_MASTER_TOKEN');
+      
+      //const token = this.configService.get<string>('META_MASTER_TOKEN');
       const url = `${this.baseUrl}/${phoneId}/messages`;
       
       const templatePayload: any = {

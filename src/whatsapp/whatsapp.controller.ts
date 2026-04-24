@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Headers, UnauthorizedException, Get } from '@nestjs/common';
+import { Controller, Post, Body, Headers, UnauthorizedException, Get, HttpCode, BadRequestException, HttpStatus } from '@nestjs/common';
 import { MetaService } from '../meta/meta.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -22,7 +22,7 @@ export class WhatsappController {
         try {
             const channel = await this.whatsappService.createChannel(body);
             return { success: true, data: channel };
-        } catch (error) {
+        } catch (error: any) {
             return { success: false, error: 'Error al crear el canal', details: error.message };
         }
     }
@@ -230,5 +230,27 @@ export class WhatsappController {
                 console.log(error);                
             }
         }
+    }
+
+    @Post('exchange-token')
+    @HttpCode(HttpStatus.OK) // Devolvemos un 200 OK en lugar del 201 por defecto de los POST
+    async exchangeCode(@Body('code') code: string) {
+        
+        // 1. Validación de seguridad básica
+        if (!code) {
+        throw new BadRequestException('El código de autorización es obligatorio');
+        }
+
+        console.log('Controlador recibió el código desde Angular:', code);
+
+        // 2. Llamamos al servicio para que vaya a la taquilla de Meta
+        const metaResponse = await this.whatsappService.exchangeCodeForToken(code);
+
+        // 3. Devolvemos el resultado al frontend (Angular)
+        return {
+        success: true,
+        message: 'WhatsApp vinculado correctamente',
+        data: metaResponse 
+        };
     }
 }

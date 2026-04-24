@@ -132,7 +132,7 @@ export class MetaService {
       // Meta devuelve el ID de la plantilla creada y el estado (generalmente 'PENDING')
       return response.data;
 
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         'Error creando plantilla en Meta:', 
         error.response?.data || error.message
@@ -224,7 +224,7 @@ export class MetaService {
           headers: { Authorization: `Bearer ${token}` }
         });
         return response.data;
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error('Error enviando plantilla con botones', error.response?.data || error.message);
         throw error;
       }

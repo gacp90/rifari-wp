@@ -6,6 +6,7 @@ import { WhatsappService } from './whatsapp.service';
 
 import { Channel, ChannelDocument } from './schemas/channel.schema';
 import { Message, MessageDocument } from './schemas/message.schema';
+import { Template, TemplateDocument } from 'src/templates/schemas/template.schema';
 
 @Controller('api/whatsapp')
 export class WhatsappController {
@@ -13,7 +14,8 @@ export class WhatsappController {
         private readonly whatsappService: WhatsappService,
         private readonly metaService: MetaService, // Inyectamos el servicio de Meta
         @InjectModel(Channel.name) private channelModel: Model<ChannelDocument>,
-        @InjectModel(Message.name) private messageModel: Model<MessageDocument>
+        @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
+        @InjectModel(Template.name) private templateModel: Model<TemplateDocument>,
     ) {}
 
     /* ============ POST CHANEL =================== */
@@ -124,7 +126,6 @@ export class WhatsappController {
     }
 
     /* ================= SEND TEMPLATE ================= */
-
     @Post('send-template')
     async sendTemplate(
         @Headers('x-api-key') apiKey: string,
@@ -174,7 +175,122 @@ export class WhatsappController {
         return { success: true };
     }
 
+
     @Post('send-template-bulk')
+    async sendTemplateBulk(
+        @Headers('x-api-key') apiKey: string,
+        @Body() body: { 
+            templateName: string;
+            customers: Array<{ phone: string; parameters: string[] }>; 
+        }
+    ) {
+        // 1. Validar el canal
+        const channel = await this.channelModel.findOne({ internalApiKey: apiKey });
+        if (!channel) throw new UnauthorizedException('API Key inválida');
+
+        // 2. LA FUENTE DE LA VERDAD: Buscar la plantilla en TU base de datos
+        // Asegúrate de buscarla por nombre y que pertenezca al WABA ID correcto
+        const template = await this.templateModel.findOne({ 
+            name: body.templateName,
+            internalApiKey: channel.internalApiKey 
+        });
+
+        if (!template) {
+            throw new BadRequestException(`La plantilla '${body.templateName}' no existe o no está sincronizada.`);
+        }
+
+        // 3. Determinar el costo según la categoría real de la base de datos
+        // Usamos toUpperCase() por si en tu BD guardaste "marketing" en minúsculas
+        const categoria = template.category.toUpperCase(); 
+        const costoPorMensaje = categoria === 'MARKETING' ? 0.080 : 0.015;
+
+        const totalCost = body.customers.length * costoPorMensaje;
+
+        // 4. MAGIA ATÓMICA: Reserva de fondos
+        const canalActualizado = await this.channelModel.findOneAndUpdate(
+            { 
+                _id: channel._id, 
+                amount: { $gte: totalCost }, 
+                isActive: true 
+            },
+            { 
+                $inc: { amount: -totalCost } 
+            },
+            { new: true } 
+        );
+
+        if (!canalActualizado) {
+            throw new BadRequestException(
+                `Saldo insuficiente o cuenta inactiva. Necesitas ${totalCost} créditos para enviar a ${body.customers.length} contactos.`
+            );
+        }
+
+        const responseMsg = `Campaña iniciada. Se han reservado ${totalCost} créditos (Categoría: ${categoria}).`;
+        
+        // 5. Ejecutamos el loop pasándole el costo calculado por el servidor
+        this.processBulkQueue(canalActualizado, body, costoPorMensaje);
+
+        return { success: true, message: responseMsg };
+    }
+
+    private async processBulkQueue(channel: any, body: any, costoPorMensaje: number) {
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const customer of body.customers) {
+            try {
+                // Llamamos a Meta
+                const result = await this.metaService.sendTemplate(
+                    channel.phoneNumberId,
+                    customer.phone,       
+                    body.templateName,    
+                    body.langCode || 'en_US',                 
+                    customer.parameters,  
+                    body.mediaUrl,        
+                    body.mediaType,       
+                    customer.buttons
+                );
+
+                // Guardamos el registro histórico del mensaje (Esto sí debe ir uno a uno)
+                await this.messageModel.create({
+                    internalApiKey: channel.internalApiKey,
+                    channelId: channel._id,
+                    wamid: result.messages[0].id,
+                    from: channel.displayPhoneNumber,
+                    to: customer.phone,
+                    direction: 'outbound',
+                    type: 'template',
+                    content: { text: `Plantilla: ${body.templateName} enviada` },
+                    status: 'sent',
+                    cost: costoPorMensaje
+                });
+
+                successCount++;
+
+                // Pausa de 100ms para cuidar el Rate Limit de Meta (Aprox 10 mensajes por segundo)
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+            } catch (error) {
+                failCount++;
+                console.error(`Error enviando a ${customer.phone}. Incrementando contador de fallos.`);                
+            }
+        }
+
+        // EL REEMBOLSO: Se ejecuta solo una vez al final del bucle
+        if (failCount > 0) {
+            const refundAmount = failCount * costoPorMensaje;
+            await this.channelModel.updateOne(
+                { _id: channel._id },
+                { $inc: { amount: refundAmount } }
+            );
+            
+            console.log(`Campaña terminada. Fallaron ${failCount}. Reembolso aplicado: +${refundAmount} créditos.`);
+        } else {
+            console.log(`Campaña 100% exitosa. ${successCount} mensajes enviados.`);
+        }
+    }
+
+    /* @Post('send-template-bulk')
     async sendTemplateBulk(
         @Headers('x-api-key') apiKey: string,
         @Body() body: { 
@@ -230,21 +346,25 @@ export class WhatsappController {
                 console.log(error);                
             }
         }
-    }
+    } */
 
     @Post('exchange-token')
     @HttpCode(HttpStatus.OK) // Devolvemos un 200 OK en lugar del 201 por defecto de los POST
-    async exchangeCode(@Body('code') code: string) {
+    async exchangeCode(
+        @Body('code') code: string,
+        @Body('wabaId') wabaId: string,
+        @Body('phoneNumberId') phoneNumberId: string
+    ) {
         
         // 1. Validación de seguridad básica
-        if (!code) {
-        throw new BadRequestException('El código de autorización es obligatorio');
-        }
+        if (!code) throw new BadRequestException('El código de autorización es obligatorio');
+        if (!wabaId) throw new BadRequestException('El ID de la cuenta de WhatsApp es obligatorio');
+        if (!phoneNumberId) throw new BadRequestException('El ID del número de teléfono es obligatorio');
 
         console.log('Controlador recibió el código desde Angular:', code);
 
         // 2. Llamamos al servicio para que vaya a la taquilla de Meta
-        const metaResponse = await this.whatsappService.exchangeCodeForToken(code);
+        const metaResponse = await this.whatsappService.exchangeCodeForToken(code, wabaId, phoneNumberId);
 
         // 3. Devolvemos el resultado al frontend (Angular)
         return {

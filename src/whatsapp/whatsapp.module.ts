@@ -5,6 +5,7 @@ import { Channel, ChannelSchema } from './schemas/channel.schema';
 import { WhatsappService } from './whatsapp.service';
 import { WhatsappController } from './whatsapp.controller';
 import { MetaModule } from 'src/meta/meta.module';
+import { Template, TemplateSchema } from 'src/templates/schemas/template.schema';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { MetaModule } from 'src/meta/meta.module';
     MongooseModule.forFeature([
       { name: Channel.name, schema: ChannelSchema },
       { name: Message.name, schema: MessageSchema },
+      { name: Template.name, schema: TemplateSchema },
     ]),
   ],
   exports: [MongooseModule],

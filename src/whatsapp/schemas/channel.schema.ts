@@ -16,22 +16,28 @@ export type ChannelDocument = Channel & Document;
 }) // Mongoose añadirá createdAt y updatedAt automáticamente
 export class Channel {
   @Prop({ required: true, index: true })
-  userId: string; // El ID del cliente/organizador en tu base de datos principal de Rifari
+  userId!: string; // El ID del cliente/organizador en tu base de datos principal de Rifari
 
   @Prop({ required: true, unique: true })
-  phoneNumberId: string; // El ID del número que Meta le asignó durante el Embedded Signup
+  phoneNumberId!: string; // El ID del número que Meta le asignó durante el Embedded Signup
 
   @Prop({ required: true })
-  wabaId: string; // WhatsApp Business Account ID
+  wabaId!: string; // WhatsApp Business Account ID
 
-  @Prop({ required: true })
-  displayPhoneNumber: string; // El número legible (ej. +58 424...) para mostrarlo en el panel
+  @Prop()
+  displayPhoneNumber!: string; // El número legible (ej. +58 424...) para mostrarlo en el panel
 
   @Prop({ required: true, unique: true })
-  internalApiKey: string; // El token que mencionaste, para que su frontend se autentique con este microservicio
+  internalApiKey!: string; // El token que mencionaste, para que su frontend se autentique con este microservicio
+
+  @Prop({ required: true, unique: true })
+  access_token!: string;
+
+  @Prop({ default: 0 })
+  amount!: number;
 
   @Prop({ default: true })
-  isActive: boolean; // Útil para pausar el servicio si un cliente no paga su suscripción
+  isActive!: boolean; // Útil para pausar el servicio si un cliente no paga su suscripción 
 }
 
 export const ChannelSchema = SchemaFactory.createForClass(Channel);

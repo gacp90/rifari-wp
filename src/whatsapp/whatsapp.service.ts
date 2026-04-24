@@ -11,20 +11,20 @@ export class WhatsappService {
     private configService: ConfigService
   ) {}
 
-  
- 
-
   async createChannel(channelData: any) {
-    const newChannel = new this.channelModel(channelData);
-    return await newChannel.save();
+    return await this.channelModel.findOneAndUpdate(
+      { phoneNumberId: channelData.phoneNumberId }, 
+      channelData, 
+      { new: true, upsert: true }
+    );
   }
 
-  async exchangeCodeForToken(codeFromAngular: string) {
+  async exchangeCodeForToken(codeFromAngular: string, wabaId: string, phoneNumberId: string) {
     try {
 
-      const APP_ID = this.configService.get<string>('APP_ID_DEVELOPERS_META') || '1797345757607881';
+      const APP_ID = this.configService.get<string>('APP_ID_DEVELOPERS_META');
       const APP_SECRET = this.configService.get<string>('KEY_SECRET_DEVELOPERS_META');
-      const API_VERSION = this.configService.get<string>('VERSION') || 'v25.0'; // Fallback crucial
+      const API_VERSION = this.configService.get<string>('VERSION');
 
       // 1. Armamos la URL oficial de Meta para el intercambio
       const url = `https://graph.facebook.com/${API_VERSION}/oauth/access_token`;
@@ -57,8 +57,14 @@ export class WhatsappService {
 
       // Fase 3: Aquí agregaríamos el código para guardar este token 
       // en MongoDB vinculado al usuario de Rifari.
+      const channel = await this.createChannel({
+        phoneNumberId: phoneNumberId,
+        wabaId: wabaId,
+        internalApiKey: permanentAccessToken,
+        access_token: permanentAccessToken,
+      });
       
-      return data;
+      return channel;
 
     } catch (error) {
       console.error('Falló el intercambio de tokens:', error);

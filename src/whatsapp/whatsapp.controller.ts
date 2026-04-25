@@ -353,11 +353,12 @@ export class WhatsappController {
     } */
 
     @Post('exchange-token')
-    @HttpCode(HttpStatus.OK) // Devolvemos un 200 OK en lugar del 201 por defecto de los POST
+    @HttpCode(HttpStatus.OK) // Devolvemos un 200 OK en lugar del 201 por defecto de los POST business_id
     async exchangeCode(
         @Body('code') code: string,
         @Body('wabaId') wabaId: string,
-        @Body('phoneNumberId') phoneNumberId: string
+        @Body('phoneNumberId') phoneNumberId: string,
+        @Body('business_id') business_id: string
     ) {
         
         // 1. Validación de seguridad básica
@@ -368,7 +369,7 @@ export class WhatsappController {
         console.log('Controlador recibió el código desde Angular:', code);
 
         // 2. Llamamos al servicio para que vaya a la taquilla de Meta
-        const metaResponse = await this.whatsappService.exchangeCodeForToken(code, wabaId, phoneNumberId);
+        const metaResponse = await this.whatsappService.exchangeCodeForToken(code, wabaId, phoneNumberId, business_id);
 
         // 3. Devolvemos el resultado al frontend (Angular)
         return {

@@ -19,7 +19,7 @@ export class WhatsappService {
     );
   }
 
-  async exchangeCodeForToken(codeFromAngular: string, wabaId: string, phoneNumberId: string) {
+  async exchangeCodeForToken(codeFromAngular: string, wabaId: string, phoneNumberId: string, business_id: string) {
     try {
 
       const APP_ID = this.configService.get<string>('APP_ID_DEVELOPERS_META');
@@ -62,6 +62,7 @@ export class WhatsappService {
         wabaId: wabaId,
         internalApiKey: permanentAccessToken,
         access_token: permanentAccessToken,
+        business_id: business_id
       });
       
       return channel;

@@ -38,6 +38,9 @@ export class WebhookController {
 
   @Post()
   receiveMessage(@Body() body: any, @Res() res: Response) {
+
+    console.log('Body puro', JSON.stringify(body));
+    
     // 1. Respondemos 200 OK a Meta inmediatamente
     res.sendStatus(HttpStatus.OK);
 

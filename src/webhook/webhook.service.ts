@@ -22,8 +22,6 @@ export class WebhookService {
 
   async processIncomingData(body: any) {
     try {
-
-      console.log('Body puro', JSON.stringify(body.object));
       
       // Validamos que sea un evento de WhatsApp
       if (body.object !== 'whatsapp_business_account') return;

@@ -80,7 +80,8 @@ export class WhatsappService {
         dailyMessagesSent: 0,
         lastMessageDate: new Date(),
         phoneNumberId: phoneNumberId,
-        business_id: business_id
+        business_id: business_id,
+        metaStatus: infoData.status
       });
       
       return channel;
@@ -112,18 +113,60 @@ export class WhatsappService {
 
       if (metaData.error) throw new Error(metaData.error.message);
 
-      // Formateamos la respuesta para tu frontend
+      // --- 1. LÓGICA DE SINCRONIZACIÓN ---
+      
+      // Convertimos el TIER a número (reutilizamos tu lógica)
+      let limiteNumerico = 250;
+      if (metaData.messaging_limit_tier) {
+          if (metaData.messaging_limit_tier === 'TIER_1K') limiteNumerico = 1000;
+          if (metaData.messaging_limit_tier === 'TIER_10K') limiteNumerico = 10000;
+          if (metaData.messaging_limit_tier === 'TIER_100K') limiteNumerico = 100000;
+          if (metaData.messaging_limit_tier === 'UNLIMITED') limiteNumerico = 9999999;
+      }
+
+      // Evaluamos el estado para activar/desactivar el canal
+      // Meta usa estos estados: CONNECTED, PENDING, OFFLINE, FLAGGED, RESTRICTED, DISCONNECTED
+      const estaActivo = ['CONNECTED', 'FLAGGED'].includes(metaData.status);
+      const numeroActualizado = metaData.display_phone_number || channel.displayPhoneNumber;
+      const nuevoMetaStatus = metaData.status;
+
+      // Actualización atómica y silenciosa en la base de datos
+      const requiereActualizacion = 
+        channel.messagingLimit !== limiteNumerico ||
+        channel.isActive !== estaActivo ||
+        channel.displayPhoneNumber !== numeroActualizado ||
+        channel.metaStatus !== nuevoMetaStatus;
+
+      // Solo tocamos la base de datos si Meta reporta algo distinto a lo que ya tenemos
+      if (requiereActualizacion) {
+          await this.channelModel.updateOne(
+            { _id: channel._id },
+            { 
+                $set: { 
+                    messagingLimit: limiteNumerico,
+                    isActive: estaActivo,
+                    displayPhoneNumber: numeroActualizado ,
+                    metaStatus: nuevoMetaStatus
+                } 
+            }
+          );
+          console.log(`[Sync] Canal ${channel.phoneNumberId} actualizado en BD por cambios en Meta.`);
+      }
+
+      // --- 2. RETORNO AL FRONTEND ---
       return {
         success: true,
         data: {
-          creditosRifari: channel.amount, // Saldo interno de tu plataforma
-          telefono: metaData.display_phone_number,
-          estadoLinea: metaData.status, // ej. CONNECTED
-          calidad: metaData.quality_rating, // ej. GREEN
-          limiteDiario: metaData.messaging_limit_tier // ej. TIER_250
+          creditosRifari: channel.amount,
+          telefono: metaData.display_phone_number || channel.displayPhoneNumber,
+          estadoLinea: metaData.status, 
+          calidad: metaData.quality_rating, 
+          limiteDiario: metaData.messaging_limit_tier 
         }
       };
+
     } catch (error) {
+      console.error('Error al sincronizar estado de Meta:', error);
       throw new InternalServerErrorException('No se pudo obtener el estado de Meta');
     }
   }

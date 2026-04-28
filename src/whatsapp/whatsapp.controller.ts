@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Headers, UnauthorizedException, Get, HttpCode, BadRequestException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Headers, UnauthorizedException, Get, HttpCode, BadRequestException, HttpStatus, ForbiddenException } from '@nestjs/common';
 import { MetaService } from '../meta/meta.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -190,6 +190,10 @@ export class WhatsappController {
         // 1. Validar el canal
         const channel = await this.channelModel.findOne({ internalApiKey: apiKey });
         if (!channel) throw new UnauthorizedException('API Key inválida');
+
+        if (!channel.isActive) {
+            throw new ForbiddenException(`Tu cuenta no está activa para enviar campañas. Estado actual: ${channel.metaStatus}`);
+        }
 
         const hoy = new Date();
         const ultimaFecha = channel.lastMessageDate || new Date(0);

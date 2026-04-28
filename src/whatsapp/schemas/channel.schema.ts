@@ -50,6 +50,9 @@ export class Channel {
 
   @Prop({default: 250})
   messagingLimit!: number;
+
+  @Prop({ default: 'PENDING' })
+  metaStatus!: string;
 }
 
 export const ChannelSchema = SchemaFactory.createForClass(Channel);

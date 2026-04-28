@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Channel, ChannelDocument } from './schemas/channel.schema';
@@ -55,13 +55,31 @@ export class WhatsappService {
       
       console.log('¡Éxito! Token permanente obtenido:', permanentAccessToken);
 
+      const infoUrl = `https://graph.facebook.com/${API_VERSION}/${phoneNumberId}?fields=display_phone_number,messaging_limit_tier`;
+      const infoResponse = await fetch(infoUrl, {
+        headers: { 'Authorization': `Bearer ${permanentAccessToken}` }
+      });
+      const infoData = await infoResponse.json();
+
+      let limiteNumerico = 250; // Por defecto
+      if (infoData.messaging_limit_tier) {
+          if (infoData.messaging_limit_tier === 'TIER_1K') limiteNumerico = 1000;
+          if (infoData.messaging_limit_tier === 'TIER_10K') limiteNumerico = 10000;
+          if (infoData.messaging_limit_tier === 'TIER_100K') limiteNumerico = 100000;
+          if (infoData.messaging_limit_tier === 'UNLIMITED') limiteNumerico = 9999999;
+      }
+
       // Fase 3: Aquí agregaríamos el código para guardar este token 
       // en MongoDB vinculado al usuario de Rifari.
       const channel = await this.createChannel({
-        phoneNumberId: phoneNumberId,
         wabaId: wabaId,
         internalApiKey: permanentAccessToken,
         access_token: permanentAccessToken,
+        displayPhoneNumber: infoData.display_phone_number || 'Número Pendiente',
+        messagingLimit: limiteNumerico,
+        dailyMessagesSent: 0,
+        lastMessageDate: new Date(),
+        phoneNumberId: phoneNumberId,
         business_id: business_id
       });
       
@@ -70,6 +88,43 @@ export class WhatsappService {
     } catch (error) {
       console.error('Falló el intercambio de tokens:', error);
       throw new InternalServerErrorException('No se pudo validar el código de WhatsApp');
+    }
+  }
+
+  async getChannelHealth(apiKey: string) {
+    const channel = await this.channelModel.findOne({ internalApiKey: apiKey });
+    if (!channel) throw new UnauthorizedException('Canal no encontrado');
+
+    const API_VERSION = this.configService.get<string>('VERSION') || 'v25.0';
+    
+    // Pedimos los datos vitales a Meta
+    const url = `https://graph.facebook.com/${API_VERSION}/${channel.phoneNumberId}?fields=quality_rating,messaging_limit_tier,status,display_phone_number`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${channel.access_token}`
+        }
+      });
+
+      const metaData = await response.json();
+
+      if (metaData.error) throw new Error(metaData.error.message);
+
+      // Formateamos la respuesta para tu frontend
+      return {
+        success: true,
+        data: {
+          creditosRifari: channel.amount, // Saldo interno de tu plataforma
+          telefono: metaData.display_phone_number,
+          estadoLinea: metaData.status, // ej. CONNECTED
+          calidad: metaData.quality_rating, // ej. GREEN
+          limiteDiario: metaData.messaging_limit_tier // ej. TIER_250
+        }
+      };
+    } catch (error) {
+      throw new InternalServerErrorException('No se pudo obtener el estado de Meta');
     }
   }
 

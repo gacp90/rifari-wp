@@ -191,6 +191,22 @@ export class WhatsappController {
         const channel = await this.channelModel.findOne({ internalApiKey: apiKey });
         if (!channel) throw new UnauthorizedException('API Key inválida');
 
+        const hoy = new Date();
+        const ultimaFecha = channel.lastMessageDate || new Date(0);
+
+        const esNuevoDia = hoy.toDateString() !== ultimaFecha.toDateString();
+
+        const mensajesEnviadosHoy = esNuevoDia ? 0 : channel.dailyMessagesSent;
+        const cantidadAEnviar = body.customers.length;
+
+        // ¿Se pasa del límite de Meta?
+        if ((mensajesEnviadosHoy + cantidadAEnviar) > channel.messagingLimit) {
+            const disponibles = channel.messagingLimit - mensajesEnviadosHoy;
+            throw new BadRequestException(
+                `Límite de Meta excedido. Tu línea permite ${channel.messagingLimit} mensajes/día. Has enviado ${mensajesEnviadosHoy} hoy. Solo puedes enviar ${disponibles} mensajes más.`
+            );
+        }
+
         // 2. LA FUENTE DE LA VERDAD: Buscar la plantilla en TU base de datos
         // Asegúrate de buscarla por nombre y que pertenezca al WABA ID correcto
         const template = await this.templateModel.findOne({ 
@@ -217,7 +233,11 @@ export class WhatsappController {
                 isActive: true 
             },
             { 
-                $inc: { amount: -totalCost } 
+                $inc: { amount: -totalCost },
+                $set: {
+                    dailyMessagesSent: mensajesEnviadosHoy + cantidadAEnviar,
+                    lastMessageDate: hoy
+                }
             },
             { new: true } 
         );
@@ -250,8 +270,8 @@ export class WhatsappController {
                     body.langCode || 'en_US', 
                     channel.access_token, // Pasamos el API Key para que el servicio de Meta pueda cargar las variables desde la base de datos                
                     customer.parameters,  
-                    body.mediaUrl,        
-                    body.mediaType,       
+                    body.mediaUrl || '',        
+                    body.mediaType || '',       
                     customer.buttons
                 );
 
@@ -274,9 +294,10 @@ export class WhatsappController {
                 // Pausa de 100ms para cuidar el Rate Limit de Meta (Aprox 10 mensajes por segundo)
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-            } catch (error) {
+            } catch (error: any) {
                 failCount++;
-                console.error(`Error enviando a ${customer.phone}. Incrementando contador de fallos.`);                
+                console.error(`Error enviando a ${customer.phone}. Incrementando contador de fallos.`);
+                console.error('Detalle de Meta/Mongoose:', error.response?.data || error.message);              
             }
         }
 
@@ -377,5 +398,11 @@ export class WhatsappController {
         message: 'WhatsApp vinculado correctamente',
         data: metaResponse 
         };
+    }
+
+    @Get('health')
+    async getHealth(@Headers('x-api-key') apiKey: string) {
+        if (!apiKey) throw new UnauthorizedException();
+        return await this.whatsappService.getChannelHealth(apiKey);
     }
 }

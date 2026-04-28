@@ -40,7 +40,16 @@ export class Channel {
   amount!: number;
 
   @Prop({ default: true })
-  isActive!: boolean; // Útil para pausar el servicio si un cliente no paga su suscripción 
+  isActive!: boolean;
+
+  @Prop()
+  lastMessageDate!: Date;
+
+  @Prop({default: 0})
+  dailyMessagesSent!: number;
+
+  @Prop({default: 250})
+  messagingLimit!: number;
 }
 
 export const ChannelSchema = SchemaFactory.createForClass(Channel);

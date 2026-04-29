@@ -69,9 +69,7 @@ export class WebhookService {
       // 2. RUTA DE MENSAJES (Tu lógica original intacta)
       // ====================================================
       if (field === 'messages') {
-        // En los mensajes, sí viene el ID del teléfono en la metadata
         const destinationPhoneId = value.metadata?.phone_number_id;
-        
         const channel = await this.channelModel.findOne({ phoneNumberId: destinationPhoneId });
         
         if (!channel) {
@@ -79,17 +77,12 @@ export class WebhookService {
           return;
         }
 
-        if (value.messages) {
-          if (value.messages.type === 'button') {
-            
-            const msg = value.messages[0].button.text;
-            await this.saveIncomingMessage(channel, msg);
-          }else{
-            const msg = value.messages[0];
-            await this.saveIncomingMessage(channel, msg);
-          }
-
-        } else if (value.statuses) {
+        if (value.messages && value.messages.length > 0) {
+          // Extraemos el objeto del mensaje sin importar si es texto, imagen o botón
+          const msg = value.messages[0]; 
+          await this.saveIncomingMessage(channel, msg);
+          
+        } else if (value.statuses && value.statuses.length > 0) {
           const statusMsg = value.statuses[0];
           await this.updateMessageStatus(statusMsg);
         }
@@ -157,6 +150,23 @@ export class WebhookService {
   private extractMessageContent(msg: any): Record<string, any> {
     if (msg.type === 'text') {
       return { text: msg.text.body };
+    }
+    
+    // 2. Mensajes de botones de respuesta rápida (El que falló)
+    if (msg.type === 'button') {
+      return { 
+        text: msg.button.text,       // Extraemos "Quiero saber mas..."
+        payload: msg.button.payload  // Por si mandas IDs ocultos en el botón
+      };
+    }
+
+    if (msg.type === 'interactive') {
+      const interactiveType = msg.interactive.type; // 'list_reply' o 'button_reply'
+      const replyObj = msg.interactive[interactiveType];
+      return { 
+        text: replyObj.title || replyObj.id || 'Selección interactiva', 
+        payload: replyObj.id 
+      };
     }
     
     // Si es imagen, audio, video o documento

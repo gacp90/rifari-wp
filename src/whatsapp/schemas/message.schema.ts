@@ -33,7 +33,7 @@ export class Message {
   @Prop({ required: true, enum: ['inbound', 'outbound'] })
   direction: string; // Para saber si el cliente de la rifa envió el mensaje o lo recibió
 
-  @Prop({ required: true, enum: ['text', 'image', 'audio', 'video', 'document', 'sticker', 'template', 'unknown'] })
+  @Prop({ required: true, enum: ['text', 'image', 'audio', 'video', 'document', 'sticker', 'template', 'button', 'interactive', 'reaction', 'unknown'] })
   type: string;
 
   // Usamos tipo JSON/Object para el contenido, así podemos guardar texto plano, 

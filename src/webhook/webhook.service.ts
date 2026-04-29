@@ -80,8 +80,15 @@ export class WebhookService {
         }
 
         if (value.messages) {
-          const msg = value.messages[0];
-          await this.saveIncomingMessage(channel, msg);
+          if (value.messages.type === 'button') {
+            
+            const msg = value.messages[0].button.text;
+            await this.saveIncomingMessage(channel, msg);
+          }else{
+            const msg = value.messages[0];
+            await this.saveIncomingMessage(channel, msg);
+          }
+
         } else if (value.statuses) {
           const statusMsg = value.statuses[0];
           await this.updateMessageStatus(statusMsg);

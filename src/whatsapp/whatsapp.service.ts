@@ -64,6 +64,7 @@ export class WhatsappService {
       let limiteNumerico = 250; // Por defecto
       if (infoData.messaging_limit_tier) {
           if (infoData.messaging_limit_tier === 'TIER_1K') limiteNumerico = 1000;
+          if (infoData.messaging_limit_tier === 'TIER_2K') limiteNumerico = 2000;
           if (infoData.messaging_limit_tier === 'TIER_10K') limiteNumerico = 10000;
           if (infoData.messaging_limit_tier === 'TIER_100K') limiteNumerico = 100000;
           if (infoData.messaging_limit_tier === 'UNLIMITED') limiteNumerico = 9999999;
@@ -88,7 +89,7 @@ export class WhatsappService {
 
     } catch (error) {
       console.error('Falló el intercambio de tokens:', error);
-      throw new InternalServerErrorException('No se pudo validar el código de WhatsApp');
+      throw new InternalServerErrorException({ok: false, msg:'No se pudo validar el código de WhatsApp'});
     }
   }
 
@@ -115,17 +116,29 @@ export class WhatsappService {
 
       // --- 1. LÓGICA DE SINCRONIZACIÓN ---
       
-      // Convertimos el TIER a número (reutilizamos tu lógica)
-      let limiteNumerico = 250;
+      // Tomamos el límite que ya existe en la base de datos (por defecto 250 si es nuevo, o el manual si se modificó)
+      let limiteNumerico = channel.messagingLimit; 
+      let limiteDiarioString = metaData.messaging_limit_tier;
+
+      // Solo si Meta envía explícitamente el dato, actualizamos nuestra variable
       if (metaData.messaging_limit_tier) {
+          if (metaData.messaging_limit_tier === 'TIER_250') limiteNumerico = 250;
           if (metaData.messaging_limit_tier === 'TIER_1K') limiteNumerico = 1000;
+          if (metaData.messaging_limit_tier === 'TIER_2K') limiteNumerico = 2000;
           if (metaData.messaging_limit_tier === 'TIER_10K') limiteNumerico = 10000;
           if (metaData.messaging_limit_tier === 'TIER_100K') limiteNumerico = 100000;
           if (metaData.messaging_limit_tier === 'UNLIMITED') limiteNumerico = 9999999;
+      } else {
+          // Si Meta no lo envía, reconstruimos el texto para el frontend basados en nuestra BD
+          if (limiteNumerico === 250) limiteDiarioString = 'TIER_250';
+          else if (limiteNumerico === 1000) limiteDiarioString = 'TIER_1K';
+          else if (limiteNumerico === 10000) limiteDiarioString = 'TIER_10K';
+          else if (limiteNumerico === 100000) limiteDiarioString = 'TIER_100K';
+          else if (limiteNumerico >= 9999999) limiteDiarioString = 'UNLIMITED';
+          else limiteDiarioString = 'TIER_250'; // Fallback por seguridad
       }
 
       // Evaluamos el estado para activar/desactivar el canal
-      // Meta usa estos estados: CONNECTED, PENDING, OFFLINE, FLAGGED, RESTRICTED, DISCONNECTED
       const estaActivo = ['CONNECTED', 'FLAGGED'].includes(metaData.status);
       const numeroActualizado = metaData.display_phone_number || channel.displayPhoneNumber;
       const nuevoMetaStatus = metaData.status;
@@ -137,7 +150,7 @@ export class WhatsappService {
         channel.displayPhoneNumber !== numeroActualizado ||
         channel.metaStatus !== nuevoMetaStatus;
 
-      // Solo tocamos la base de datos si Meta reporta algo distinto a lo que ya tenemos
+      // Solo tocamos la base de datos si algo cambió respecto a lo que tenemos
       if (requiereActualizacion) {
           await this.channelModel.updateOne(
             { _id: channel._id },
@@ -150,7 +163,7 @@ export class WhatsappService {
                 } 
             }
           );
-          console.log(`[Sync] Canal ${channel.phoneNumberId} actualizado en BD por cambios en Meta.`);
+          console.log(`[Sync] Canal ${channel.phoneNumberId} actualizado en BD. Límite numérico: ${limiteNumerico}`);
       }
 
       // --- 2. RETORNO AL FRONTEND ---
@@ -158,17 +171,17 @@ export class WhatsappService {
         success: true,
         data: {
           creditosRifari: channel.amount,
-          telefono: metaData.display_phone_number || channel.displayPhoneNumber,
+          telefono: numeroActualizado,
           estadoLinea: metaData.status, 
-          calidad: metaData.quality_rating, 
-          limiteDiario: metaData.messaging_limit_tier 
+          calidad: metaData.quality_rating || 'UNKNOWN', 
+          limiteDiario: limiteDiarioString // Enviamos el string reconstruido o el original de Meta
         }
       };
 
     } catch (error) {
       console.error('Error al sincronizar estado de Meta:', error);
-      throw new InternalServerErrorException('No se pudo obtener el estado de Meta');
+      throw new InternalServerErrorException({ok: false, msg:'No se pudo obtener el estado de Meta'});
     }
-  }
+}
 
 }

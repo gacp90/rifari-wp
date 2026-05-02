@@ -142,7 +142,7 @@ export class MetaService {
       // (ej. "El nombre de la plantilla ya existe" o "Formato inválido")
       const metaErrorMessage = error.response?.data?.error?.message || 'Error desconocido al crear la plantilla en Meta';
       
-      throw new BadRequestException(`Fallo en Meta: ${metaErrorMessage}`);
+      throw new BadRequestException({ok: false, msg:`Fallo en Meta: ${metaErrorMessage}`});
     }
   }
 
@@ -155,6 +155,15 @@ export class MetaService {
     });
         
     return response.data.data; // Retorna array de plantillas
+  }
+
+  private sanitizeTemplateVariable(value: any): string {
+    if (!value) return '';
+    
+    return String(value)
+      .replace(/[\r\n\t]+/g, ' ') // 1. Convierte saltos de línea y tabulaciones en espacios simples
+      .replace(/\s{2,}/g, ' ')    // 2. Reduce múltiples espacios seguidos a un solo espacio
+      .trim();                    // 3. Elimina espacios en blanco al principio y al final
   }
 
   /* ================= SEND TEMPLATE ================= */
@@ -193,7 +202,7 @@ export class MetaService {
           type: 'body',
           parameters: bodyVariables.map(variable => ({
             type: 'text',
-            text: String(variable)
+            text: this.sanitizeTemplateVariable(variable)
           }))
         });
       }

@@ -192,7 +192,9 @@ export class WhatsappController {
         if (!channel) throw new UnauthorizedException('API Key inválida');
 
         if (!channel.isActive) {
-            throw new ForbiddenException(`Tu cuenta no está activa para enviar campañas. Estado actual: ${channel.metaStatus}`);
+            throw new ForbiddenException({
+                ok: false,
+                msg: `Tu cuenta no está activa para enviar campañas. Estado actual: ${channel.metaStatus}`});
         }
 
         const hoy = new Date();
@@ -206,9 +208,10 @@ export class WhatsappController {
         // ¿Se pasa del límite de Meta?
         if ((mensajesEnviadosHoy + cantidadAEnviar) > channel.messagingLimit) {
             const disponibles = channel.messagingLimit - mensajesEnviadosHoy;
-            throw new BadRequestException(
-                `Límite de Meta excedido. Tu línea permite ${channel.messagingLimit} mensajes/día. Has enviado ${mensajesEnviadosHoy} hoy. Solo puedes enviar ${disponibles} mensajes más.`
-            );
+            throw new BadRequestException({
+                ok: false,
+                msg: `Límite de Meta excedido. Tu línea permite ${channel.messagingLimit} mensajes/día. Has enviado ${mensajesEnviadosHoy} hoy. Solo puedes enviar ${disponibles} mensajes más.`
+            });
         }
 
         // 2. LA FUENTE DE LA VERDAD: Buscar la plantilla en TU base de datos
@@ -219,7 +222,9 @@ export class WhatsappController {
         });
 
         if (!template) {
-            throw new BadRequestException(`La plantilla '${body.templateName}' no existe o no está sincronizada.`);
+            throw new BadRequestException({
+                ok: false,
+                msg:`La plantilla '${body.templateName}' no existe o no está sincronizada.`});
         }
 
         // 3. Determinar el costo según la categoría real de la base de datos
@@ -247,9 +252,10 @@ export class WhatsappController {
         );
 
         if (!canalActualizado) {
-            throw new BadRequestException(
-                `Saldo insuficiente o cuenta inactiva. Necesitas ${totalCost} créditos para enviar a ${body.customers.length} contactos.`
-            );
+            throw new BadRequestException({
+                ok: false,
+                msg:`Saldo insuficiente o cuenta inactiva. Necesitas ${totalCost} créditos para enviar a ${body.customers.length} contactos.`
+            });
         }
 
         const responseMsg = `Campaña iniciada. Se han reservado ${totalCost} créditos (Categoría: ${categoria}).`;
@@ -272,7 +278,7 @@ export class WhatsappController {
                     customer.phone,       
                     body.templateName,    
                     body.langCode || 'en_US', 
-                    channel.access_token, // Pasamos el API Key para que el servicio de Meta pueda cargar las variables desde la base de datos                
+                    channel.access_token,
                     customer.parameters,  
                     body.mediaUrl || '',        
                     body.mediaType || '',       
@@ -319,64 +325,6 @@ export class WhatsappController {
         }
     }
 
-    /* @Post('send-template-bulk')
-    async sendTemplateBulk(
-        @Headers('x-api-key') apiKey: string,
-        @Body() body: { 
-            templateName: string;
-            // Ahora recibimos un objeto con el teléfono y sus variables personalizadas
-            customers: Array<{ phone: string; parameters: string[] }>; 
-        }
-        ) {
-            const channel = await this.channelModel.findOne({ internalApiKey: apiKey });
-            if (!channel) throw new UnauthorizedException();
-
-            // Devolvemos el OK al frontend inmediatamente
-            const responseMsg = `Enviando ${body.customers.length} mensajes en segundo plano.`;
-            
-            // Ejecutamos el loop sin el 'await' para que el usuario no se quede esperando
-            this.processBulkQueue(channel, body);
-
-            return { success: true, message: responseMsg };
-        }
-
-        private async processBulkQueue(channel: any, body: any) {
-        for (const customer of body.customers) {
-            try {
-            // Llamamos a Meta, pasándole los parámetros dinámicos de ESE cliente
-            const result = await this.metaService.sendTemplate(
-                channel.phoneNumberId,
-                customer.phone,       
-                body.templateName,    
-                body.langCode || 'en_US',                 
-                customer.parameters,  
-                body.mediaUrl,        
-                body.mediaType,       
-                customer.buttons
-            );
-
-            // Guardamos en nuestra DB
-            await this.messageModel.create({
-                internalApiKey: channel.internalApiKey,
-                channelId: channel._id,
-                wamid: result.messages[0].id,
-                from: channel.displayPhoneNumber,
-                to: customer.phone,
-                direction: 'outbound',
-                type: 'template',
-                content: { text: `Plantilla: ${body.templateName} enviada a ${customer.parameters[0]}` },
-                status: 'sent'
-            });
-
-            // Pausa de 100ms para cuidar el Rate Limit de Meta y nuestra DB
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            } catch (error) {
-                console.log(error);                
-            }
-        }
-    } */
-
     @Post('exchange-token')
     @HttpCode(HttpStatus.OK) // Devolvemos un 200 OK en lugar del 201 por defecto de los POST business_id
     async exchangeCode(
@@ -387,9 +335,9 @@ export class WhatsappController {
     ) {
         
         // 1. Validación de seguridad básica
-        if (!code) throw new BadRequestException('El código de autorización es obligatorio');
-        if (!wabaId) throw new BadRequestException('El ID de la cuenta de WhatsApp es obligatorio');
-        if (!phoneNumberId) throw new BadRequestException('El ID del número de teléfono es obligatorio');
+        if (!code) throw new BadRequestException({ok: false, msg:'El código de autorización es obligatorio'});
+        if (!wabaId) throw new BadRequestException({ok: false, msg:'El ID de la cuenta de WhatsApp es obligatorio'});
+        if (!phoneNumberId) throw new BadRequestException({ok: false, msg:'El ID del número de teléfono es obligatorio'});
 
         console.log('Controlador recibió el código desde Angular:', code);
 

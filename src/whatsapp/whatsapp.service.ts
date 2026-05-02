@@ -115,10 +115,11 @@ export class WhatsappService {
       if (metaData.error) throw new Error(metaData.error.message);
 
       // --- 1. LÓGICA DE SINCRONIZACIÓN ---
-      
       // Tomamos el límite que ya existe en la base de datos (por defecto 250 si es nuevo, o el manual si se modificó)
+      
       let limiteNumerico = channel.messagingLimit; 
       let limiteDiarioString = metaData.messaging_limit_tier;
+      console.log('LIMITE: ', limiteNumerico);
 
       // Solo si Meta envía explícitamente el dato, actualizamos nuestra variable
       if (metaData.messaging_limit_tier) {
@@ -128,14 +129,6 @@ export class WhatsappService {
           if (metaData.messaging_limit_tier === 'TIER_10K') limiteNumerico = 10000;
           if (metaData.messaging_limit_tier === 'TIER_100K') limiteNumerico = 100000;
           if (metaData.messaging_limit_tier === 'UNLIMITED') limiteNumerico = 9999999;
-      } else {
-          // Si Meta no lo envía, reconstruimos el texto para el frontend basados en nuestra BD
-          if (limiteNumerico === 250) limiteDiarioString = 'TIER_250';
-          else if (limiteNumerico === 1000) limiteDiarioString = 'TIER_1K';
-          else if (limiteNumerico === 10000) limiteDiarioString = 'TIER_10K';
-          else if (limiteNumerico === 100000) limiteDiarioString = 'TIER_100K';
-          else if (limiteNumerico >= 9999999) limiteDiarioString = 'UNLIMITED';
-          else limiteDiarioString = 'TIER_250'; // Fallback por seguridad
       }
 
       // Evaluamos el estado para activar/desactivar el canal
@@ -174,7 +167,7 @@ export class WhatsappService {
           telefono: numeroActualizado,
           estadoLinea: metaData.status, 
           calidad: metaData.quality_rating || 'UNKNOWN', 
-          limiteDiario: limiteDiarioString // Enviamos el string reconstruido o el original de Meta
+          limiteDiario: limiteNumerico // Enviamos el string reconstruido o el original de Meta
         }
       };
 

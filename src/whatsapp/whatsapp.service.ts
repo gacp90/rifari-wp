@@ -133,6 +133,7 @@ export class WhatsappService {
           // Si Meta no lo envía, reconstruimos el texto para el frontend basados en nuestra BD
           if (limiteNumerico === 250) limiteDiarioString = 'TIER_250';
           else if (limiteNumerico === 1000) limiteDiarioString = 'TIER_1K';
+          else if (limiteNumerico === 2000) limiteDiarioString = 'TIER_2K';
           else if (limiteNumerico === 10000) limiteDiarioString = 'TIER_10K';
           else if (limiteNumerico === 100000) limiteDiarioString = 'TIER_100K';
           else if (limiteNumerico >= 9999999) limiteDiarioString = 'UNLIMITED';

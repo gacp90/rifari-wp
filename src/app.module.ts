@@ -10,6 +10,7 @@ import { MediaController } from './media/media.controller';
 import { MediaModule } from './media/media.module';
 import { ChatModule } from './chat/chat.module';
 import { TemplatesModule } from './templates/templates.module';
+import { SpidiModule } from './spidi/spidi.module';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { TemplatesModule } from './templates/templates.module';
     MetaModule, 
     WebhookModule, 
     WhatsappModule, 
-    MediaModule, ChatModule, TemplatesModule
+    MediaModule, ChatModule, TemplatesModule, SpidiModule
   ],
   controllers: [AppController, MediaController],
   providers: [AppService],

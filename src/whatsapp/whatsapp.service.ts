@@ -119,7 +119,6 @@ export class WhatsappService {
       
       let limiteNumerico = channel.messagingLimit; 
       let limiteDiarioString = metaData.messaging_limit_tier;
-      console.log('LIMITE: ', limiteNumerico);
 
       // Solo si Meta envía explícitamente el dato, actualizamos nuestra variable
       if (metaData.messaging_limit_tier) {

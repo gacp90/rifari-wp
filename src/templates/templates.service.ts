@@ -247,8 +247,8 @@ export class TemplatesService {
   // HELPER: META RESUMABLE UPLOAD API
   // ==========================================
   private async uploadToMetaResumableAPI(accessToken: string, buffer: Buffer, mimeType: string, fileLength: number): Promise<string> {
-    const API_VERSION = this.configService.get<string>('VERSION') || 'v25.0';
-    const APP_ID = this.configService.get<string>('META_APP_ID');
+    const API_VERSION = this.configService.get<string>('META_API_VERSION') || 'v25.0';
+    const APP_ID = this.configService.get<string>('APP_ID_DEVELOPERS_META');
 
     // Fase A: Crear la sesión de subida
     const sessionUrl = `https://graph.facebook.com/${API_VERSION}/${APP_ID}/uploads?file_length=${fileLength}&file_type=${mimeType}`;

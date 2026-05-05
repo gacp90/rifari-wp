@@ -178,7 +178,7 @@ export class WhatsappController {
         return { success: true };
     }
 
-
+    /* ================= SEND MASIVE TEMPLATE ================= */
     @Post('send-template-bulk')
     async sendTemplateBulk(
         @Headers('x-api-key') apiKey: string,
@@ -215,7 +215,6 @@ export class WhatsappController {
         }
 
         // 2. LA FUENTE DE LA VERDAD: Buscar la plantilla en TU base de datos
-        // Asegúrate de buscarla por nombre y que pertenezca al WABA ID correcto
         const template = await this.templateModel.findOne({ 
             name: body.templateName,
             internalApiKey: channel.internalApiKey 
@@ -228,7 +227,6 @@ export class WhatsappController {
         }
 
         // 3. Determinar el costo según la categoría real de la base de datos
-        // Usamos toUpperCase() por si en tu BD guardaste "marketing" en minúsculas
         const categoria = template.category.toUpperCase(); 
         const costoPorMensaje = categoria === 'MARKETING' ? 0.080 : 0.015;
 
@@ -260,15 +258,20 @@ export class WhatsappController {
 
         const responseMsg = `Campaña iniciada. Se han reservado ${totalCost} créditos (Categoría: ${categoria}).`;
         
-        // 5. Ejecutamos el loop pasándole el costo calculado por el servidor
-        this.processBulkQueue(canalActualizado, body, costoPorMensaje);
+        // 5. Ejecutamos el loop pasándole EL TEMPLATE COMPLETO desde la BD
+        this.processBulkQueue(canalActualizado, body, costoPorMensaje, template);
 
         return { success: true, message: responseMsg };
     }
 
-    private async processBulkQueue(channel: any, body: any, costoPorMensaje: number) {
+    /* ================= PROCESS MASIVES MESSAGES ================= */
+    private async processBulkQueue(channel: any, body: any, costoPorMensaje: number, template: any) {
         let successCount = 0;
         let failCount = 0;
+
+        // LA MAGIA: Extraemos la URL y el tipo de multimedia de forma segura desde la BD
+        const mediaUrl = template.hasMedia ? template.headerContent : undefined;
+        const mediaType = template.hasMedia ? template.headerType.toLowerCase() : undefined;
 
         for (const customer of body.customers) {
             try {
@@ -276,16 +279,16 @@ export class WhatsappController {
                 const result = await this.metaService.sendTemplate(
                     channel.phoneNumberId,
                     customer.phone,       
-                    body.templateName,    
-                    body.langCode || 'en_US', 
+                    template.name, // Tomado de la BD directamente
+                    template.language, // Tomado de la BD directamente
                     channel.access_token,
                     customer.parameters,  
-                    body.mediaUrl || '',        
-                    body.mediaType || '',       
+                    mediaUrl,  // Inyectado de forma segura
+                    mediaType, // Inyectado de forma segura (image, video, document)
                     customer.buttons
                 );
 
-                // Guardamos el registro histórico del mensaje (Esto sí debe ir uno a uno)
+                // Guardamos el registro histórico del mensaje
                 await this.messageModel.create({
                     internalApiKey: channel.internalApiKey,
                     channelId: channel._id,
@@ -294,14 +297,14 @@ export class WhatsappController {
                     to: customer.phone,
                     direction: 'outbound',
                     type: 'template',
-                    content: { text: `Plantilla: ${body.templateName} enviada` },
+                    content: { text: `Plantilla: ${template.name} enviada` },
                     status: 'sent',
                     cost: costoPorMensaje
                 });
 
                 successCount++;
 
-                // Pausa de 100ms para cuidar el Rate Limit de Meta (Aprox 10 mensajes por segundo)
+                // Pausa de 100ms para cuidar el Rate Limit de Meta
                 await new Promise(resolve => setTimeout(resolve, 100));
 
             } catch (error: any) {

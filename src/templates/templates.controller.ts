@@ -1,7 +1,10 @@
-import { Controller, Get, Post, Delete, Body, Headers, Param, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Headers, Param, Patch, UseInterceptors, Req, UploadedFile, BadRequestException, UseGuards } from '@nestjs/common';
 import { TemplatesService } from './templates.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiKeyGuard } from 'src/guards/api-key/api-key.guard';
 
 @Controller('api/templates')
+@UseGuards(ApiKeyGuard)
 export class TemplatesController {
   constructor(private readonly templatesService: TemplatesService) {}
 
@@ -26,6 +29,34 @@ export class TemplatesController {
   @Post()
   async createTemplate(@Headers('x-api-key') apiKey: string, @Body() body: any) {
     return this.templatesService.createTemplate(apiKey, body);
+  }
+
+  @Post('media')
+  @UseInterceptors(FileInterceptor('file')) 
+  async createMediaTemplate(
+    @Req() req,
+    @UploadedFile() file: any, // Cambiado a any para evitar la alerta de Multer
+    @Body('templateData') templateDataString: string // Angular enviará todo el objeto aquí
+  ) {
+    
+    if (!file) {
+      throw new BadRequestException({ ok: false, msg: 'El archivo multimedia es obligatorio.' });
+    }
+
+    const channel = req.channel;
+    let templateData: any = {};
+
+    try {
+      // Convertimos el string que manda Angular a un objeto JSON real
+      if (templateDataString) {
+        templateData = JSON.parse(templateDataString);
+      }
+    } catch (error) {
+      throw new BadRequestException({ ok: false, msg: 'El formato de templateData es inválido.' });
+    }
+
+    // ¡Descomentamos el return y enviamos los datos limpios!
+    return this.templatesService.createMediaTemplate(channel, file, templateData);
   }
 
   @Patch(':id/toggle-active')

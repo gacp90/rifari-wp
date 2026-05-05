@@ -1,19 +1,45 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Template, TemplateDocument } from './schemas/template.schema';
 import { Channel, ChannelDocument } from '../whatsapp/schemas/channel.schema';
 import { MetaService } from '../meta/meta.service';
+import 'multer';
+
+import { ConfigService } from '@nestjs/config';
+
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import * as crypto from 'crypto';
+import sharp from 'sharp';
 
 @Injectable()
 export class TemplatesService {
   private readonly logger = new Logger(TemplatesService.name);
+  private s3Client!: S3Client;
 
   constructor(
     @InjectModel(Template.name) private templateModel: Model<TemplateDocument>,
     @InjectModel(Channel.name) private channelModel: Model<ChannelDocument>,
     private readonly metaService: MetaService,
-  ) {}
+    private configService: ConfigService
+  ) {
+
+    this.s3Client = new S3Client({
+      region: process.env.DO_SPACES_REGION || 'nyc3',
+      endpoint: process.env.DO_SPACES_ENDPOINT,
+      credentials: {
+        accessKeyId: process.env.DO_SPACES_KEY || '',
+        secretAccessKey: process.env.DO_SPACES_SECRET || '',
+      }
+    });
+
+    if (process.env.DO_SPACES_KEY) {
+      this.logger.log('Conexión a DigitalOcean Spaces preparada.');
+    } else {
+      this.logger.warn('ALERTA: Faltan credenciales de DigitalOcean en el .env');
+    }
+
+  }
 
   // ==========================================
   // 1. CREAR PLANTILLA (Enviar a Meta y Guardar Local)
@@ -52,7 +78,15 @@ export class TemplatesService {
       // Header
       if (templateData.headerType !== 'NONE') {
         const headerParams: any = { type: 'HEADER', format: templateData.headerType };
-        if (templateData.headerType === 'TEXT') headerParams.text = templateData.headerText;
+        
+        if (templateData.headerType === 'TEXT') {
+          // Si es texto, le asignamos el texto
+          headerParams.text = templateData.headerText;
+        } else if (templateData.headerHandle) {
+          // LA MAGIA: Si es imagen/video/documento, le asignamos el handle de Meta
+          headerParams.example = { header_handle: [templateData.headerHandle] };
+        }
+        
         components.push(headerParams);
       }
 
@@ -81,6 +115,13 @@ export class TemplatesService {
       // Descomenta esto cuando estés listo para hacer la petición real
       await this.metaService.registerTemplate(channel.wabaId, metaPayload, channel.access_token);
 
+      let contenidoDelHeader = null;
+      if (templateData.headerType === 'TEXT') {
+        contenidoDelHeader = templateData.headerText;
+      } else if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(templateData.headerType)) {
+        contenidoDelHeader = templateData.publicMediaUrl; // La URL de DigitalOcean
+      }
+
       // 4. GUARDAMOS EN NUESTRA BASE DE DATOS LOCAL
       // Aquí guardamos la versión amigable para que tu software la lea fácil después
       const newTemplate = new this.templateModel({
@@ -91,7 +132,8 @@ export class TemplatesService {
         status: 'PENDING',
         hasMedia: ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(templateData.headerType),
         headerType: templateData.headerType,
-        headerContent: templateData.headerType === 'TEXT' ? templateData.headerText : null,
+
+        headerContent: contenidoDelHeader,
         
         // LA CLAVE: Guardamos el texto original "Hola {{name}}"
         bodyText: templateData.bodyText, 
@@ -109,6 +151,150 @@ export class TemplatesService {
     } catch (error) {
       this.logger.error('Error creando plantilla:', error);
       throw new BadRequestException('Error al registrar la plantilla en Meta');
+    }
+  }
+
+  // ==========================================
+  // 2. CREAR PLANTILLA MULTIMEDIA
+  // ==========================================
+  async createMediaTemplate(channel: any, file: any, templateData: any) {
+    let finalBuffer = file.buffer;
+    let finalMimeType = file.mimetype;
+    let extension = file.originalname.split('.').pop().toLowerCase();
+    
+    const isImage = file.mimetype.startsWith('image/');
+    const isVideo = file.mimetype.startsWith('video/');
+
+    if (!isImage && !isVideo) {
+      throw new BadRequestException({ ok: false, msg: 'Solo se permiten imágenes (JPEG/PNG) o videos (MP4).' });
+    }
+
+    // --- PASO 1: OPTIMIZACIÓN (Solo para imágenes) ---
+    if (isImage) {
+      try {
+        finalBuffer = await sharp(file.buffer)
+          .jpeg({ quality: 80, progressive: true }) // Comprimimos en JPEG como exige Meta
+          .toBuffer();
+        finalMimeType = 'image/jpeg';
+        extension = 'jpeg';
+      } catch (err) {
+        throw new BadRequestException({ ok: false, msg: 'Error al procesar la imagen con Sharp.' });
+      }
+    }
+
+    // --- PASO 2: SUBIR A DIGITAL OCEAN SPACES ---
+    const fileName = `${crypto.randomUUID()}.${extension}`;
+    // Estructura limpia: rifari-media/ID_DEL_CANAL/images/uuid.jpeg
+    const folder = isImage ? 'images' : 'videos';
+    const s3Key = `rifari-media/${channel._id}/${folder}/${fileName}`; 
+    const bucketName = this.configService.get<string>('DO_SPACES_BUCKET'); // ej: 'rifari-bucket'
+
+    try {
+      await this.s3Client.send(new PutObjectCommand({
+        Bucket: bucketName,
+        Key: s3Key,
+        Body: finalBuffer,
+        ACL: 'public-read', // Para que puedas usar la URL luego en los envíos
+        ContentType: finalMimeType,
+      }));
+    } catch (err) {
+      this.logger.error('Error subiendo a DigitalOcean:', err);
+      throw new InternalServerErrorException({ ok: false, msg: 'Error guardando el archivo en la nube.' });
+    }
+
+    // La URL pública que guardaremos en base de datos para el envío masivo futuro
+    const publicUrl = `https://${process.env.DO_SPACES_BUCKET}.${process.env.DO_SPACES_REGION}.digitaloceanspaces.com/${s3Key}`;
+
+
+    // --- PASO 3: SUBIR A META (Resumable API) PARA REVISIÓN ---
+    const metaHandle = await this.uploadToMetaResumableAPI(channel.access_token, finalBuffer, finalMimeType, finalBuffer.length);
+
+
+    // --- PASO 4: INYECTAR EL HANDLE Y CREAR LA PLANTILLA EN META ---
+    
+    // Buscamos el componente HEADER en el array que nos mandó Angular
+    const headerIndex = templateData.components.findIndex(c => c.type === 'HEADER');
+    if (headerIndex !== -1) {
+      // Le decimos a Meta que evalúe la plantilla usando el archivo temporal que acabamos de subir
+      templateData.components[headerIndex].example = {
+        header_handle: [metaHandle]
+      };
+    } else {
+      // Si el frontend no mandó un HEADER por error, lo construimos
+      templateData.components.push({
+        type: 'HEADER',
+        format: isImage ? 'IMAGE' : 'VIDEO',
+        example: { header_handle: [metaHandle] }
+      });
+    }
+
+    templateData.headerHandle = metaHandle;
+    templateData.publicMediaUrl = publicUrl;
+
+    // Ahora sí, creamos la plantilla usando la misma función de texto
+    const templateResponse = await this.createTemplate(channel.internalApiKey, templateData);
+
+    // --- PASO 5: RETORNO MÁGICO ---
+    return {
+      ok: true,
+      msg: 'Plantilla multimedia enviada a revisión',
+      metaData: templateResponse.data,
+      publicUrl: publicUrl 
+    };
+  }
+
+  // ==========================================
+  // HELPER: META RESUMABLE UPLOAD API
+  // ==========================================
+  private async uploadToMetaResumableAPI(accessToken: string, buffer: Buffer, mimeType: string, fileLength: number): Promise<string> {
+    const API_VERSION = this.configService.get<string>('VERSION') || 'v25.0';
+    const APP_ID = this.configService.get<string>('META_APP_ID');
+
+    // Fase A: Crear la sesión de subida
+    const sessionUrl = `https://graph.facebook.com/${API_VERSION}/${APP_ID}/uploads?file_length=${fileLength}&file_type=${mimeType}`;
+    
+    let sessionId: string;
+    try {
+      const sessionRes = await fetch(sessionUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      const sessionData = await sessionRes.json();
+      
+      if (sessionData.error) throw new Error(sessionData.error.message);
+      sessionId = sessionData.id;
+    } catch (err) {
+      this.logger.error('Error creando sesión Resumable en Meta:', err);
+      throw new InternalServerErrorException({ ok: false, msg: 'Error iniciando subida a Meta' });
+    }
+
+    // Fase B: Subir los bytes usando el Session ID
+    const uploadUrl = `https://graph.facebook.com/${API_VERSION}/${sessionId}`;
+    
+    // LA SOLUCIÓN: Convertimos el Buffer de Node a un Blob estándar web
+    const fileBlob = new Blob([new Uint8Array(buffer)], { type: mimeType });
+
+    try {
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `OAuth ${accessToken}`,
+          'file_offset': '0'
+          // Nota: fetch calculará el Content-Length automáticamente gracias al Blob
+        },
+        body: fileBlob // <-- Enviamos el Blob, no el Buffer crudo
+      });
+      
+      const uploadData = await uploadRes.json();
+      
+      if (uploadData.error) throw new Error(uploadData.error.message);
+      
+      // Retornamos el famoso "handle" (ej: 4:W21hc...)
+      return uploadData.h; 
+      
+    } catch (err) {
+      this.logger.error('Error transfiriendo bytes a Meta:', err);
+      throw new InternalServerErrorException({ ok: false, msg: 'Error transfiriendo archivo a Meta' });
     }
   }
 

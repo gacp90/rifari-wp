@@ -4,7 +4,7 @@ import { CreateSpidiDto } from './dto/create-spidi.dto';
 import { UpdateSpidiDto } from './dto/update-spidi.dto';
 import { ApiKeyGuard } from 'src/guards/api-key/api-key.guard';
 
-@Controller('spidi')
+@Controller('/api/spidi')
 export class SpidiController {
   constructor(private readonly spidiService: SpidiService) {}
 
@@ -35,6 +35,8 @@ export class SpidiController {
   // Ruta PÚBLICA: Spidi la llama para avisar que el pago se completó
   @Post('webhook')
   async handleWebhook(@Body() payload: any, @Headers('x-spidi-signature') signature: string) {    
+    console.log(payload);
+    
     return this.spidiService.processSpidiWebhook(payload);
   }
 }

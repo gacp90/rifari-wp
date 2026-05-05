@@ -57,7 +57,7 @@ export class SpidiService {
       description: `Recarga de creditos por ${creditosComprados}`,
       success_url: `${link}/pagos?status=exito`,
       failure_url: `${link}/pagos?status=fallido`,
-      webhook_url: `${process.env.APP_PUBLIC_URL}/api/v1/spidi/webhook`
+      webhook_url: `${process.env.APP_PUBLIC_URL}/api/spidi/webhook`
     };
 
     try {

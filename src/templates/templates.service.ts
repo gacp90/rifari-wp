@@ -210,24 +210,8 @@ export class TemplatesService {
     const metaHandle = await this.uploadToMetaResumableAPI(channel.access_token, finalBuffer, finalMimeType, finalBuffer.length);
 
 
-    // --- PASO 4: INYECTAR EL HANDLE Y CREAR LA PLANTILLA EN META ---
-    
+    // --- PASO 4: INYECTAR EL HANDLE Y CREAR LA PLANTILLA EN META ---    
     // Buscamos el componente HEADER en el array que nos mandó Angular
-    const headerIndex = templateData.components.findIndex(c => c.type === 'HEADER');
-    if (headerIndex !== -1) {
-      // Le decimos a Meta que evalúe la plantilla usando el archivo temporal que acabamos de subir
-      templateData.components[headerIndex].example = {
-        header_handle: [metaHandle]
-      };
-    } else {
-      // Si el frontend no mandó un HEADER por error, lo construimos
-      templateData.components.push({
-        type: 'HEADER',
-        format: isImage ? 'IMAGE' : 'VIDEO',
-        example: { header_handle: [metaHandle] }
-      });
-    }
-
     templateData.headerHandle = metaHandle;
     templateData.publicMediaUrl = publicUrl;
 

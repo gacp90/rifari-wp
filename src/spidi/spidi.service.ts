@@ -158,7 +158,7 @@ export class SpidiService {
       const history = await this.transactionModel
         .find({ internalApiKey: apiKey })
         .sort({ createdAt: -1 }) // Orden descendente: lo más nuevo primero
-        .select('-spidiRawData') // Excluimos el payload gigante de Spidi para ahorrar ancho de banda
+        //.select('-spidiRawData') // Excluimos el payload gigante de Spidi para ahorrar ancho de banda
         .limit(50); // Límite de seguridad para no saturar la red (opcional)
 
       return {

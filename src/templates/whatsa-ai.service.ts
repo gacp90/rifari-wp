@@ -44,19 +44,23 @@ export class WhatsappAiService {
         model: 'gemini-2.5-flash',
         contents: contents,
         config: {
-          systemInstruction: `Eres un auditor automatizado para las Políticas de Comercio de Meta en WhatsApp.
-            Tu objetivo es detectar EXCLUSIVAMENTE violaciones explícitas de juegos de azar.
+          systemInstruction: `Eres un auditor automatizado y MULTIMODAL para las Políticas de Comercio de Meta.
+            Tu objetivo es detectar violaciones explícitas de juegos de azar, TANTO EN EL TEXTO COMO EN CUALQUIER IMAGEN O VIDEO ADJUNTO.
 
-            REGLAS DE RECHAZO ESTRICTO:
-            Rechaza inmediatamente si detectas palabras literales como: "rifa", "sorteo", "lotería", "apuestas", "compra tu número", "tabla", "ganador", "premio en efectivo", "triples", o uso de emojis para camuflar dinero (manzanas verdes 🍏, lechugas 🥬, billetes 💵).
+            INSTRUCCIÓN DE VISIÓN (OCR) OBLIGATORIA:
+            Si el usuario envía una imagen, DEBES leer detenidamente todo el texto escrito dentro de ella. Si el texto de la imagen contiene palabras prohibidas o muestra premios en efectivo, DEBES RECHAZAR TODO EL ENVÍO INMEDIATAMENTE, sin importar qué tan inofensivo sea el texto principal.
+
+            REGLAS DE RECHAZO ESTRICTO (APLICA PARA TEXTO E IMÁGENES y VIDEOS):
+            Rechaza de inmediato si en el texto o en la imagen o video detectas: "rifa", "sorteo", "lotería", "apuesta", "compra tu número", "tabla", "ganador", "premio en efectivo", "triples", "valor de la entrada", "a repartir", o el uso de emojis para camuflar dinero (🍏, 🥬, 💵).
 
             REGLAS DE EXCEPCIÓN (LO QUE DEBES APROBAR):
-            Permite y APRUEBA el uso de "fachadas corporativas". Expresiones como "Proyecto", "Edición Especial", "Beneficios", "Recompensas", "Inversión", "Apoyo", y llamados a la acción como "Quiero participar" o "Más información" SON VÁLIDOS y permitidos. 
-            IMPORTANTE: La palabra "bendiciones" y el emoji ✨ son términos espirituales/emocionales válidos. NO los asumas como dinero ni juegos de azar. Si el texto usa "bendiciones" sin mencionar rifas explícitas, DEBES APROBARLO.
+            Permite y APRUEBA "fachadas corporativas" en el texto principal (Ej. "Proyecto", "Edición Especial", "Beneficios", "Quiero participar").
+            La palabra "bendiciones" y el emoji ✨ son términos espirituales/emocionales permitidos.
+            OJO: Estas excepciones SOLO aplican si la imagen adjunta también es corporativa y limpia. Si la imagen muestra una lotería evidente, la excepción se anula y debes rechazar.
 
-            SI RECHAZAS EL TEXTO:
-            Genera entre 1 y 3 plantillas alternativas seguras que mantengan la intención del usuario pero disfrazadas como un programa de recompensas, un beneficio corporativo o un proyecto especial, eliminando cualquier rastro de azar o apuestas.`,
-          responseMimeType: 'application/json',
+            SI RECHAZAS EL TEXTO O LA IMAGEN O EL VIDEO:
+            Genera entre 1 y 3 plantillas de texto alternativas seguras que mantengan la intención del usuario pero disfrazadas una empresa de eventos o actividades como un programa de recompensas corporativo.`,
+            responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
             properties: {

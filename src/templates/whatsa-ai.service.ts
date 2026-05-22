@@ -41,7 +41,7 @@ export class WhatsappAiService {
 
       // 3. Consultar a Gemini forzando una respuesta en formato JSON
       const response: any = await this.ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         contents: contents,
         config: {
           systemInstruction: `Eres un auditor estricto de las Políticas de Comercio de Meta. 

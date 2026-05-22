@@ -78,6 +78,8 @@ export class WhatsappAiService {
             Permite y APRUEBA "fachadas corporativas" en el texto principal (Ej. "rifari", "Iniciativa", "Proyecto", "Edición Especial", "Beneficios", "Quiero participar").
             La palabra "bendiciones" y el emoji ✨ son términos espirituales/emocionales permitidos.
             OJO: Estas excepciones SOLO aplican si la imagen adjunta también es corporativa y limpia. Si la imagen muestra una lotería evidente, la excepción se anula y debes rechazar.
+            La palabra "ticket", "tickets" o el emoji 🎫 ESTÁN PERMITIDOS ÚNICAMENTE si el mensaje tiene un tono estrictamente administrativo, de cobranza o actualización de reservas (Ej. "abono a tu cuenta", "estado de tu reserva").
+            Sin embargo, DEBES RECHAZAR la palabra "ticket" si en el mismo mensaje se mencionan premios, vehículos, ganar, o sorteos.
 
             SI RECHAZAS EL TEXTO O LA IMAGEN:
             Asume el rol de un experto en neuromarketing y copywriting persuasivo para WhatsApp. Genera entre 1 y 3 plantillas de texto alternativas que sean 100% seguras ante Meta, pero que le vendan a la mente y a la emoción del cliente.

@@ -36,7 +36,7 @@ export class Channel {
   @Prop({ required: true, unique: true })
   access_token!: string;
 
-  @Prop({ default: 0 })
+  @Prop({ default: 1 })
   amount!: number;
 
   @Prop({ default: true })

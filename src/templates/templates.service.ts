@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Template, TemplateDocument } from './schemas/template.schema';
@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import * as crypto from 'crypto';
 import sharp from 'sharp';
+import { WhatsappAiService } from './whatsa-ai.service';
 
 @Injectable()
 export class TemplatesService {
@@ -18,6 +19,7 @@ export class TemplatesService {
   private s3Client!: S3Client;
 
   constructor(
+    private readonly whatsappAiService: WhatsappAiService,
     @InjectModel(Template.name) private templateModel: Model<TemplateDocument>,
     @InjectModel(Channel.name) private channelModel: Model<ChannelDocument>,
     private readonly metaService: MetaService,
@@ -39,6 +41,34 @@ export class TemplatesService {
       this.logger.warn('ALERTA: Faltan credenciales de DigitalOcean en el .env');
     }
 
+  }
+
+  // ==========================================
+  // VALIDAR PLANTILLA CON IA (Auditoría automática antes de enviar a Meta)
+  // ==========================================
+  async procesarYValidar(apiKey: string, texto: string, file?: Express.Multer.File) {
+    
+    // 1. Verificar si el canal tiene al menos $0.01 de saldo
+    const canal = await this.channelModel.findOne({ internalApiKey: apiKey });
+    if (!canal || canal.amount < 0.01) {
+      throw new ForbiddenException({ok: false, msg: 'Saldo insuficiente para validar la plantilla ($0.01 requerido).'});
+    } 
+   
+
+    // 2. Enviar a auditar a la IA
+    const resultadoIA = await this.whatsappAiService.auditarPlantilla(texto, file);
+
+    // 3. Cobrar el centavo automáticamente (Operación atómica)    
+    await this.channelModel.updateOne(
+      { _id: canal._id }, 
+      { $inc: { amount: -0.01 } }
+    );
+   
+
+    // 4. Registrar en el historial de transacciones (Kardex) que mencionamos antes
+    // await this.historialService.registrarCobro(canalId, 0.01, 'Validación de Plantilla con IA');
+
+    return resultadoIA;
   }
 
   // ==========================================

@@ -6,6 +6,7 @@ import { Template } from './entities/template.entity';
 import { TemplateSchema } from './schemas/template.schema';
 import { Channel, ChannelSchema } from 'src/whatsapp/schemas/channel.schema';
 import { MetaModule } from 'src/meta/meta.module';
+import { WhatsappAiService } from './whatsa-ai.service';
 
 @Module({
   imports: [
@@ -17,6 +18,6 @@ import { MetaModule } from 'src/meta/meta.module';
     MetaModule
   ],
   controllers: [TemplatesController],
-  providers: [TemplatesService],
+  providers: [TemplatesService, WhatsappAiService],
 })
 export class TemplatesModule {}

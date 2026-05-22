@@ -2,11 +2,38 @@ import { Controller, Get, Post, Delete, Body, Headers, Param, Patch, UseIntercep
 import { TemplatesService } from './templates.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiKeyGuard } from 'src/guards/api-key/api-key.guard';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 
 @Controller('api/templates')
 @UseGuards(ApiKeyGuard)
 export class TemplatesController {
   constructor(private readonly templatesService: TemplatesService) {}
+
+  @Post('validar')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads', // Crea esta carpeta en la raíz de tu proyecto
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+      limits: { fileSize: 20 * 1024 * 1024 }, // Límite de 20MB
+    }),
+  )
+  async validar(
+    @Headers('x-api-key') apiKey: string,
+    @Body('texto') texto: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!texto || !apiKey) {
+      throw new BadRequestException({ ok: false, msg: 'El texto de la plantilla y la API Key son obligatorios.' });
+    }
+
+    return await this.templatesService.procesarYValidar(apiKey, texto, file);
+  }
 
   @Post('query')
   async searchTemplates(

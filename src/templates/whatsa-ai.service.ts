@@ -18,14 +18,35 @@ export class WhatsappAiService {
       // 1. Procesar el archivo si el cliente subió una imagen o video
       if (file) {
         if (file.mimetype.startsWith('video/')) {
+          // A) Subimos el video a los servidores de Google
           const uploadResult = await this.ai.files.upload({
             file: file.path,
             config: {
                 mimeType: file.mimetype,
             }
           });
-          contents.push(uploadResult);
-        } else if (file.mimetype.startsWith('image/')) {
+
+          // B) Bucle de espera: Asegurarnos de que Google terminó de procesar el video
+          let fileInfo = await this.ai.files.get({ name: uploadResult.name! });
+          while (fileInfo.state === 'PROCESSING') {
+            // Pausamos la ejecución 2 segundos y volvemos a preguntar
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            fileInfo = await this.ai.files.get({ name: uploadResult.name! });
+          }
+
+          if (fileInfo.state === 'FAILED') {
+            throw new Error('Los servidores de Google no pudieron procesar el video adjunto.');
+          }
+
+          // C) Estructura correcta (fileData) requerida por el SDK para archivos subidos
+          contents.push({
+            fileData: {
+              fileUri: uploadResult.uri,
+              mimeType: uploadResult.mimeType,
+            },
+          });
+          
+        }else if (file.mimetype.startsWith('image/')) {
           const imageBuffer = fs.readFileSync(file.path);
           contents.push({
             inlineData: {
@@ -54,12 +75,19 @@ export class WhatsappAiService {
             Rechaza de inmediato si en el texto o en la imagen o video detectas: "rifa", "sorteo", "lotería", "apuesta", "compra tu número", "tabla", "ganador", "premio en efectivo", "triples", "valor de la entrada", "a repartir", o el uso de emojis para camuflar dinero (🍏, 🥬, 💵).
 
             REGLAS DE EXCEPCIÓN (LO QUE DEBES APROBAR):
-            Permite y APRUEBA "fachadas corporativas" en el texto principal (Ej. "Proyecto", "Edición Especial", "Beneficios", "Quiero participar").
+            Permite y APRUEBA "fachadas corporativas" en el texto principal (Ej. "rifari", "Iniciativa", "Proyecto", "Edición Especial", "Beneficios", "Quiero participar").
             La palabra "bendiciones" y el emoji ✨ son términos espirituales/emocionales permitidos.
             OJO: Estas excepciones SOLO aplican si la imagen adjunta también es corporativa y limpia. Si la imagen muestra una lotería evidente, la excepción se anula y debes rechazar.
 
-            SI RECHAZAS EL TEXTO O LA IMAGEN O EL VIDEO:
-            Genera entre 1 y 3 plantillas de texto alternativas seguras que mantengan la intención del usuario pero disfrazadas una empresa de eventos o actividades como un programa de recompensas corporativo.`,
+            SI RECHAZAS EL TEXTO O LA IMAGEN:
+            Asume el rol de un experto en neuromarketing y copywriting persuasivo para WhatsApp. Genera entre 1 y 3 plantillas de texto alternativas que sean 100% seguras ante Meta, pero que le vendan a la mente y a la emoción del cliente.
+
+            REGLAS ESTRICTAS PARA TUS SUGERENCIAS:
+            1. Usa ganchos psicológicos: Inicia con preguntas o escenarios que activen la imaginación (Ej. "¿Qué harías si...", "Imagina por un segundo...", "Visualiza...").
+            2. Tono cercano y de intriga: Escribe de forma natural, emocionante y conversacional. NUNCA uses un tono robótico, aburrido o excesivamente corporativo (prohibido usar frases como "programa de reconocimiento", "ceremonia", o "iniciativa corporativa").
+            3. Sustitución inteligente: Cambia las palabras de azar (ticket, rifa, ganar) por conceptos aspiracionales (ej: "unirte al proyecto", "asegurar tu lugar", "la gran meta", "edición especial").
+            4. Mantén la urgencia: Incluye llamados a la acción claros y fechas límite sin sonar desesperado.`,
+            
             responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,

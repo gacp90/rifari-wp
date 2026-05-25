@@ -35,8 +35,6 @@ export class SpidiController {
   // Ruta PÚBLICA: Spidi la llama para avisar que el pago se completó
   @Post('webhook')
   async handleWebhook(@Body() payload: any, @Headers('x-spidi-signature') signature: string) {    
-    console.log(payload);
-    
     return this.spidiService.processSpidiWebhook(payload);
   }
 }

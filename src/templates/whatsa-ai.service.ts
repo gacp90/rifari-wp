@@ -92,14 +92,35 @@ export class WhatsappAiService {
               La palabra "ticket", "tickets" o el emoji 🎫 ESTÁN PERMITIDOS ÚNICAMENTE si el mensaje tiene un tono estrictamente administrativo, de cobranza o actualización de reservas (Ej. "abono a tu cuenta", "estado de tu reserva"). Sin embargo, DEBES RECHAZARLA si en el mismo mensaje se mencionan premios, vehículos, ganar, o sorteos.
 
               SI RECHAZAS EL TEXTO O LA IMAGEN:
-              Asume el rol de un experto en neuromarketing y copywriting persuasivo para WhatsApp. Genera entre 1 y 3 plantillas de texto alternativas que sean 100% seguras ante Meta, pero que le vendan a la mente y a la emoción del cliente.
+              Asume el rol de un experto en neuromarketing y copywriting persuasivo para WhatsApp. Genera entre 3 y 5 plantillas de texto alternativas que sean 100% seguras ante Meta. 
+              ES VITAL QUE DES VARIEDAD DE TAMAÑOS: Incluye al menos dos opciones que sean extremadamente cortas, directas y simples (para envíos rápidos), y dos opciones más desarrolladas con técnicas de ventas.
 
               REGLAS ESTRICTAS PARA TUS SUGERENCIAS:
-              1. Usa ganchos psicológicos: Inicia con preguntas o escenarios que activen la imaginación (Ej. "¿Qué harías si...", "Imagina por un segundo...", "Visualiza...").
-              2. Tono cercano y de intriga: Escribe de forma natural y emocionante. NUNCA uses un tono robótico, aburrido o excesivamente corporativo.
-              3. Sustitución inteligente: Cambia las palabras de azar por conceptos aspiracionales (ej: "unirte al proyecto", "asegurar tu lugar", "la gran meta", "edición especial").
-              4. Mantén la urgencia: Incluye llamados a la acción claros y fechas límite sin sonar desesperado.
-              5. El Gancho para abrir la ventana de 24h: NUNCA sugieras mencionar la palabra "premios", "sorteos" ni detalles específicos de regalos. Usa el principio de "curiosidad extrema" para obligar al usuario final a responder el mensaje (lo que abre la ventana de servicio permitida por Meta). Usa conceptos como "Tengo una sorpresa especial para ti", "Hay un anuncio exclusivo esperándote", o "Desbloqueaste un beneficio oculto". SIEMPRE cierra la sugerencia con un Llamado a la Acción (CTA) que exija una respuesta rápida: "Responde 'QUIERO VER' para enviarte los detalles por aquí", o "¿Me das permiso para mostrarte de qué se trata?".
+              1. Variedad de longitud: La opción 1 y 2 deben ser muy breves, directas y al grano, manteniendo la estructura corta original del usuario pero limpiando las palabras prohibidas (Ej. Cambiar "tu reservado es {{number}}" por "tu código de acceso es {{number}}").
+              2. Usa ganchos psicológicos (Para las opciones largas): Inicia con preguntas o escenarios que activen la imaginación (Ej. "¿Qué harías si...").
+              3. Tono cercano y de intriga: Escribe de forma natural y emocionante. NUNCA uses un tono robótico, aburrido o excesivamente corporativo.
+              4. Sustitución inteligente: Cambia palabras de azar o emojis de dinero (🥦, 🥬, 💵) por conceptos de valor neutros (ej: "beneficios", "sorpresa", 🎁, 🌟) y cambia "ticket/reservado" por "código", "acceso" o "registro".
+              5. El Gancho para abrir la ventana de 24h: NUNCA sugieras mencionar la palabra "premios", "sorteos" ni detalles de montos o regalos. Usa el principio de "curiosidad extrema" para obligar al usuario a responder. SIEMPRE cierra con un Llamado a la Acción (CTA) rápido: "Responde 'QUIERO VER' para los detalles", o "¿Te muestro de qué se trata?".
+              
+              MAPEO DE INTENCIONES (CÓMO TRADUCIR EL MENSAJE DEL USUARIO):
+              Analiza qué intenta comunicar el usuario y genera sugerencias basadas en estos 4 escenarios exactos:
+
+              1. Promoción de Rifa/Sorteo Nuevo: 
+              Si intentan vender números, transfórmalo en un "Lanzamiento de Proyecto" o "Fase de Inscripción". 
+              El CTA (Gancho): "Responde 'INFO' para enviarte el catálogo de beneficios."
+
+              2. Recordatorio de Pago/Abono: 
+              Si piden dinero, transfórmalo en un mensaje 100% administrativo sobre "Estado de Cuenta" o "Actualización de Reserva".
+              El CTA (Gancho): "Responde 'PAGADO' si ya lo hiciste, o 'AYUDA' si necesitas más tiempo."
+
+              3. Anuncio de Premio Especial (Carros, $200, etc.): 
+              Si mencionan dinero o premios específicos, ESTÁ PROHIBIDO REPETIRLO en las sugerencias. Transfórmalo en "Una sorpresa desbloqueada", "Un bono especial para miembros activos" o "Un beneficio oculto". 
+              El CTA (Gancho): "Hay algo increíble esperando por ti. Responde 'QUIERO VER' para mostrarte de qué se trata."
+
+              4. Ultimátum / Liberación de Número: 
+              Si amenazan con quitar el número por falta de pago, transfórmalo en una "Verificación de Reserva". 
+              El CTA (Gancho): "Tu lugar está a punto de expirar. Responde 'CONFIRMAR' ahora mismo para mantener tu reserva activa, de lo contrario será reasignado."
+              
               `,
                 
                 responseMimeType: 'application/json',

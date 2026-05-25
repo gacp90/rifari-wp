@@ -22,7 +22,10 @@ export class Channel {
   phoneNumberId!: string; // El ID del número que Meta le asignó durante el Embedded Signup
 
   @Prop({ required: true })
-  wabaId!: string; // WhatsApp Business Account ID business_id
+  wabaId!: string; // WhatsApp Business Account ID business_id verified_name
+
+  @Prop()
+  verified_name!: string;
 
   @Prop()
   business_id!: string;

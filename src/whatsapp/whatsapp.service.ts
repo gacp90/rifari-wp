@@ -55,19 +55,19 @@ export class WhatsappService {
       
       console.log('¡Éxito! Token permanente obtenido:', permanentAccessToken);
 
-      const infoUrl = `https://graph.facebook.com/${API_VERSION}/${phoneNumberId}?fields=display_phone_number,messaging_limit_tier`;
+      const infoUrl = `https://graph.facebook.com/${API_VERSION}/${phoneNumberId}?fields=display_phone_number,whatsapp_business_manager_messaging_limit,verified_name`;
       const infoResponse = await fetch(infoUrl, {
         headers: { 'Authorization': `Bearer ${permanentAccessToken}` }
       });
       const infoData = await infoResponse.json();
 
       let limiteNumerico = 250; // Por defecto
-      if (infoData.messaging_limit_tier) {
-          if (infoData.messaging_limit_tier === 'TIER_1K') limiteNumerico = 1000;
-          if (infoData.messaging_limit_tier === 'TIER_2K') limiteNumerico = 2000;
-          if (infoData.messaging_limit_tier === 'TIER_10K') limiteNumerico = 10000;
-          if (infoData.messaging_limit_tier === 'TIER_100K') limiteNumerico = 100000;
-          if (infoData.messaging_limit_tier === 'UNLIMITED') limiteNumerico = 9999999;
+      if (infoData.whatsapp_business_manager_messaging_limit) {
+          if (infoData.whatsapp_business_manager_messaging_limit === 'TIER_1K') limiteNumerico = 1000;
+          if (infoData.whatsapp_business_manager_messaging_limit === 'TIER_2K') limiteNumerico = 2000;
+          if (infoData.whatsapp_business_manager_messaging_limit === 'TIER_10K') limiteNumerico = 10000;
+          if (infoData.whatsapp_business_manager_messaging_limit === 'TIER_100K') limiteNumerico = 100000;
+          if (infoData.whatsapp_business_manager_messaging_limit === 'UNLIMITED') limiteNumerico = 9999999;
       }
 
       // Fase 3: Aquí agregaríamos el código para guardar este token 
@@ -78,6 +78,7 @@ export class WhatsappService {
         access_token: permanentAccessToken,
         displayPhoneNumber: infoData.display_phone_number || 'Número Pendiente',
         messagingLimit: limiteNumerico,
+        verified_name: infoData.verified_name || 'Nombre Pendiente',
         dailyMessagesSent: 0,
         lastMessageDate: new Date(),
         phoneNumberId: phoneNumberId,
@@ -100,7 +101,7 @@ export class WhatsappService {
     const API_VERSION = this.configService.get<string>('VERSION') || 'v25.0';
     
     // Pedimos los datos vitales a Meta
-    const url = `https://graph.facebook.com/${API_VERSION}/${channel.phoneNumberId}?fields=quality_rating,messaging_limit_tier,status,display_phone_number`;
+    const url = `https://graph.facebook.com/${API_VERSION}/${channel.phoneNumberId}?fields=quality_rating,whatsapp_business_manager_messaging_limit,status,display_phone_number,verified_name`;
 
     try {
       const response = await fetch(url, {
@@ -118,16 +119,16 @@ export class WhatsappService {
       // Tomamos el límite que ya existe en la base de datos (por defecto 250 si es nuevo, o el manual si se modificó)
       
       let limiteNumerico = channel.messagingLimit; 
-      let limiteDiarioString = metaData.messaging_limit_tier;
+      let limiteDiarioString = metaData.whatsapp_business_manager_messaging_limit || 'TIER_250'; // Valor original de Meta o fallback
 
       // Solo si Meta envía explícitamente el dato, actualizamos nuestra variable
-      if (metaData.messaging_limit_tier) {
-          if (metaData.messaging_limit_tier === 'TIER_250') limiteNumerico = 250;
-          if (metaData.messaging_limit_tier === 'TIER_1K') limiteNumerico = 1000;
-          if (metaData.messaging_limit_tier === 'TIER_2K') limiteNumerico = 2000;
-          if (metaData.messaging_limit_tier === 'TIER_10K') limiteNumerico = 10000;
-          if (metaData.messaging_limit_tier === 'TIER_100K') limiteNumerico = 100000;
-          if (metaData.messaging_limit_tier === 'UNLIMITED') limiteNumerico = 9999999;
+      if (metaData.whatsapp_business_manager_messaging_limit) {
+          if (metaData.whatsapp_business_manager_messaging_limit === 'TIER_250') limiteNumerico = 250;
+          if (metaData.whatsapp_business_manager_messaging_limit === 'TIER_1K') limiteNumerico = 1000;
+          if (metaData.whatsapp_business_manager_messaging_limit === 'TIER_2K') limiteNumerico = 2000;
+          if (metaData.whatsapp_business_manager_messaging_limit === 'TIER_10K') limiteNumerico = 10000;
+          if (metaData.whatsapp_business_manager_messaging_limit === 'TIER_100K') limiteNumerico = 100000;
+          if (metaData.whatsapp_business_manager_messaging_limit === 'UNLIMITED') limiteNumerico = 9999999;
       } else {
           // Si Meta no lo envía, reconstruimos el texto para el frontend basados en nuestra BD
           if (limiteNumerico === 250) limiteDiarioString = 'TIER_250';
@@ -175,7 +176,8 @@ export class WhatsappService {
           telefono: numeroActualizado,
           estadoLinea: metaData.status, 
           calidad: metaData.quality_rating || 'UNKNOWN', 
-          limiteDiario: limiteDiarioString // Enviamos el string reconstruido o el original de Meta
+          limiteDiario: limiteDiarioString, // Enviamos el string reconstruido o el original de Meta
+          verified_name: metaData.verified_name || 'Nombre Pendiente',
         }
       };
 

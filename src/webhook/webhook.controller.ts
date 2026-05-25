@@ -37,13 +37,9 @@ export class WebhookController {
   }
 
   @Post()
-  receiveMessage(@Body() body: any, @Res() res: Response) {
-
-    console.log('Body puro', JSON.stringify(body));
-    
+  receiveMessage(@Body() body: any, @Res() res: Response) {    
     // 1. Respondemos 200 OK a Meta inmediatamente
     res.sendStatus(HttpStatus.OK);
-
     // 2. Le pasamos el JSON a nuestro servicio para que lo analice y guarde en MongoDB
     if (body.object === 'whatsapp_business_account') {
       this.webhookService.processIncomingData(body);

@@ -79,12 +79,17 @@ export class WhatsappAiService {
               REGLAS DE RECHAZO ESTRICTO (APLICA PARA TEXTO, IMÁGENES Y VIDEOS):
               Rechaza de inmediato si detectas: "rifa", "sorteo", "lotería", "apuesta", "compra tu número", "tabla", "ganador", "premio en efectivo", "triples", "valor de la entrada", "a repartir", o el uso de emojis para camuflar dinero (🍏, 🥬, 💵).
 
+              REGLA DE APROBACIÓN POR DEFECTO (CERO FALSOS POSITIVOS - MUY IMPORTANTE):
+              Tu configuración es "Inocente hasta que se demuestre lo contrario". Si un mensaje NO contiene explícitamente ninguna de las palabras prohibidas de la lista anterior, DEBES APROBARLO INMEDIATAMENTE (aprobado: true).
+              NO sobre-analices, NO asumas intenciones ocultas, y NO rechaces mensajes por ser breves.
+              Las frases como "Hoy iniciamos con nuestros especiales", "tu código es", "tu reservado es", o mensajes cortos que solo saludan y entregan una variable (Ej. "Buen dia {{name}} su codigo es {{number}}") SON 100% PERMITIDOS.
+
               REGLA SOBRE VARIABLES DINÁMICAS DE WHATSAPP (MUY IMPORTANTE):
               El texto a evaluar contendrá variables encerradas en dobles llaves, por ejemplo: {{name}}, {{number}}, {{proyecto}}, {{1}}, etc.
               1. Estas son etiquetas del sistema para insertar datos de clientes. NO son palabras literales del mensaje.
               2. La etiqueta {{number}} se refiere a un dato de contacto, código o valor dinámico neutro. NUNCA la interpretes como "número de lotería", "número de rifa" o juego de azar.
-              3. DEBES APROBAR mensajes neutros o inofensivos que usen estas variables (Ej. "Hoy iniciamos {{number}}" o "Hola {{name}}"). Solo rechaza si las palabras reales que RODEAN a la variable violan explícitamente las reglas.
-
+              3. DEBES APROBAR mensajes neutros o inofensivos que usen estas variables.
+              
               REGLAS DE EXCEPCIÓN (LO QUE DEBES APROBAR):
               Permite y APRUEBA "fachadas corporativas" en el texto principal (Ej. "rifari", "Iniciativa", "Proyecto", "Edición Especial", "Beneficios", "Quiero participar").
               La palabra "bendiciones" y el emoji ✨ son términos espirituales/emocionales permitidos.

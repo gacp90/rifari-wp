@@ -161,7 +161,8 @@ export class WhatsappService {
                     messagingLimit: limiteNumerico,
                     isActive: estaActivo,
                     displayPhoneNumber: numeroActualizado ,
-                    metaStatus: nuevoMetaStatus
+                    metaStatus: nuevoMetaStatus,
+                    verified_name: metaData.verified_name || 'Nombre Pendiente',
                 } 
             }
           );

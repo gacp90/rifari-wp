@@ -85,6 +85,18 @@ export class WhatsappService {
         business_id: business_id,
         metaStatus: infoData.status
       });
+
+      const urlSuscribe = `https://graph.facebook.com/v25.0/${wabaId}/subscribed_apps`;
+      const responseSub = await fetch(urlSuscribe, {
+        headers: { 'Authorization': `Bearer ${permanentAccessToken}` }
+      });
+
+      const infoSubs = await responseSub.json();
+      if (infoSubs.error) {
+        console.error('Error al suscribir la app:', infoSubs.error);
+      } else {
+        console.log('App suscrita exitosamente:', infoSubs);
+      }
       
       return channel;
 

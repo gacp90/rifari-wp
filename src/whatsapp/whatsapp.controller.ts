@@ -273,6 +273,8 @@ export class WhatsappController {
         const mediaUrl = template.hasMedia ? template.headerContent : undefined;
         const mediaType = template.hasMedia ? template.headerType.toLowerCase() : undefined;
 
+        console.log(`Iniciando envío masivo para plantilla '${template.name}' del canal ${channel.verified_name || channel.displayPhoneNumber}.`);
+
         for (const customer of body.customers) {
             try {
                 // Llamamos a Meta
@@ -305,7 +307,7 @@ export class WhatsappController {
                 successCount++;
 
                 // Pausa de 100ms para cuidar el Rate Limit de Meta
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, 500));
 
             } catch (error: any) {
                 failCount++;

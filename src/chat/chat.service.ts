@@ -2,46 +2,30 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Message, MessageDocument } from '../whatsapp/schemas/message.schema';
+import { Conversation } from './schemas/conversation.schema';
 
 @Injectable()
 export class ChatService {
   constructor(
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
+    @InjectModel(Conversation.name) private conversationModel: Model<Conversation>,
   ) {}
 
   async getChatList(internalApiKey: string) {
-    return await this.messageModel.aggregate([
-      { $match: { internalApiKey } },
-      {
-        // Creamos un campo que siempre contenga el número del cliente
-        $addFields: {
-          chatWith: {
-            $cond: [
-              { $eq: ['$direction', 'inbound'] }, 
-              '$from', // Si entra, el cliente es 'from'
-              '$to'    // Si sale, el cliente es 'to'
-            ]
-          }
-        }
-      },
-      { $sort: { createdAt: -1 } },
-      {
-        $group: {
-          _id: '$chatWith', // Agrupamos por el cliente, no por el emisor
-          lastMessage: { $first: '$$ROOT' },
-          unreadCount: { 
-            $sum: { 
-              $cond: [
-                { $and: [{ $eq: ['$status', 'received'] }, { $eq: ['$direction', 'inbound'] }] }, 
-                1, 0
-              ] 
-            } 
-          }
-        }
-      },
-      { $sort: { 'lastMessage.createdAt': -1 } }
-    ]);
-  }
+    // Calculamos el límite exacto de las 24 horas
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+    // Hacemos una consulta directa indexada
+    return await this.conversationModel
+      .find({
+        internalApiKey: internalApiKey,
+        // Filtro mágico: solo chats donde el cliente haya escrito en las últimas 24h
+        lastInboundDate: { $gte: twentyFourHoursAgo }
+      })
+      .sort({ 'lastMessage.createdAt': -1 }) // Los chats con actividad más reciente primero
+      .exec();
+}
 
   // Extra: Un método para traer la conversación de un solo cliente (paginado)
   async getMessagesByCustomer(internalApiKey: string, customerPhone: string, limit = 50) {

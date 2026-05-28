@@ -7,6 +7,7 @@ import { Message, MessageDocument } from '../whatsapp/schemas/message.schema';
 import { MetaService } from '../meta/meta.service';
 import { ChatGateway } from 'src/chat/chat.gateway';
 import { Template, TemplateDocument } from 'src/templates/schemas/template.schema';
+import { Conversation } from 'src/chat/schemas/conversation.schema';
 
 @Injectable()
 export class WebhookService {
@@ -15,6 +16,7 @@ export class WebhookService {
   constructor(
     @InjectModel(Channel.name) private channelModel: Model<ChannelDocument>,
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
+    @InjectModel(Conversation.name) private conversationModel: Model<Conversation>,
     @InjectModel(Template.name) private templateModel: Model<TemplateDocument>,
     private readonly metaService: MetaService, 
     private readonly chatGateway: ChatGateway,
@@ -66,6 +68,29 @@ export class WebhookService {
       }
 
       // ====================================================
+      // 2. RUTA DE CAMBIO DE CATEGORÍA (NUEVO WEBHOOK)
+      // ====================================================
+      if (field === 'template_category_update') {
+        const templateName = value.message_template_name;
+        const language = value.message_template_language;
+        const previousCategory = value.previous_category;
+        const newCategory = value.new_category; // Ej: Pasa de 'UTILITY' a 'MARKETING'
+
+        this.logger.warn(`[Webhook] ALERTA: Meta reclasificó la plantilla '${templateName}' de ${previousCategory} a ${newCategory}.`);
+
+        const channel = await this.channelModel.findOne({ wabaId: wabaId });
+
+        if (channel) {
+          // Actualizamos la categoría en la BD para que tu sistema sepa que ahora cuesta más
+          await this.templateModel.updateOne(
+            { internalApiKey: channel.internalApiKey, name: templateName, language: language },
+            { $set: { category: newCategory } }
+          );
+        }
+        return; 
+      }
+
+      // ====================================================
       // 2. RUTA DE MENSAJES (Tu lógica original intacta)
       // ====================================================
       if (field === 'messages') {
@@ -96,17 +121,18 @@ export class WebhookService {
   private async saveIncomingMessage(channel: ChannelDocument, msg: any) {
     const extracted = this.extractMessageContent(msg);
     
-    // 1. Declaramos la variable fuera del IF para que tenga alcance global en la función
+    // 1. Declaramos la variable fuera del IF para que tenga alcance global
     let savedFileName: string | null = null; 
 
+    // ==========================================
+    // LÓGICA DE MULTIMEDIA (Intacta)
+    // ==========================================
     if (extracted.mediaId) {
       try {
         const extension = this.getExtensions(extracted.mimeType);
-        // Generamos el nombre
         const fileName = `${extracted.mediaId}${extension}`;
         
         const url = await this.metaService.getMediaUrl(extracted.mediaId, channel.access_token);
-        // downloadMedia ahora nos devuelve solo el nombre (según el cambio anterior)
         savedFileName = await this.metaService.downloadMedia(url, fileName, channel.access_token);
         
         this.logger.log(`📁 Archivo descargado exitosamente: ${savedFileName}`);
@@ -115,27 +141,73 @@ export class WebhookService {
       }
     }
 
-    const newMessage = new this.messageModel({
+    // ==========================================
+    // LÓGICA DE ECO Y DIRECCIÓN
+    // ==========================================
+    // Detectamos si el remitente es el propio número de tu cliente (Rifari)
+    const isEcho = msg.from === channel.displayPhoneNumber;
+    const customerPhone = isEcho ? msg.to : msg.from; 
+    const msgDirection = isEcho ? 'outbound' : 'inbound';
+    const msgStatus = isEcho ? 'sent' : 'received';
+
+    const messageData = {
       internalApiKey: channel.internalApiKey,
       channelId: channel._id,
       wamid: msg.id,
-      from: msg.from,
-      to: channel.displayPhoneNumber,
-      direction: 'inbound',
+      from: isEcho ? channel.displayPhoneNumber : msg.from,
+      to: isEcho ? customerPhone : channel.displayPhoneNumber,
+      direction: msgDirection,
       type: msg.type,
-      content: {
-        ...extracted,
-        fileName: savedFileName 
-      },
-      status: 'received',
-    });
+      content: { ...extracted, fileName: savedFileName },
+      status: msgStatus,
+    };
 
-    const savedMsg = await newMessage.save();
-    this.chatGateway.emitNewMessage(channel.internalApiKey, {
-      message: savedMsg,
-      customer: msg.from
-    });
-    this.logger.log(`✅ Mensaje [${msg.type}] de ${msg.from} guardado.`);
+    // 1. Guardar mensaje en la colección histórica (Con tu control de duplicados)
+    const updateResult = await this.messageModel.updateOne(
+      { wamid: msg.id },
+      { $setOnInsert: messageData },
+      { upsert: true }
+    );
+
+    // ¡SI EL MENSAJE ES NUEVO, ACTUALIZAMOS LA BANDEJA DE ENTRADA!
+    if (updateResult.upsertedId) {
+      
+      // Estructuramos la actualización de la conversación
+      const conversationUpdate: any = {
+        $set: {
+          channelId: channel._id,
+          lastMessage: {
+            wamid: msg.id,
+            text: extracted.text?.body || `[Multimedia: ${msg.type}]`,
+            type: msg.type,
+            direction: msgDirection,
+            createdAt: new Date(),
+          },
+        },
+      };
+
+      // REGLA CRÍTICA: Si el mensaje viene del cliente (INBOUND), actualizamos la ventana de 24h
+      if (!isEcho) {
+        conversationUpdate.$set.lastInboundDate = new Date(); // Guardamos el momento exacto en que escribió
+        conversationUpdate.$inc = { unreadCount: 1 };        // Incrementamos contador de no leídos
+      }
+
+      // Ejecutamos el Upsert en la colección de Conversaciones
+      await this.conversationModel.updateOne(
+        { internalApiKey: channel.internalApiKey, customerPhone: customerPhone },
+        conversationUpdate,
+        { upsert: true }
+      );
+
+      // Emitimos por WebSockets para que el frontend de Angular se entere en tiempo real
+      const savedMsg = await this.messageModel.findById(updateResult.upsertedId);
+      this.chatGateway.emitNewMessage(channel.internalApiKey, {
+        message: savedMsg,
+        customer: customerPhone
+      });
+      
+      this.logger.log(`✅ Mensaje e Historial de Chat actualizados para ${customerPhone}`);
+    }
   }
 
   private async updateMessageStatus(statusMsg: any) {

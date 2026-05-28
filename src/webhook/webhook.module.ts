@@ -7,6 +7,7 @@ import { ChatModule } from 'src/chat/chat.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Template, TemplateSchema } from 'src/templates/schemas/template.schema';
 import { Channel, ChannelSchema } from 'src/whatsapp/schemas/channel.schema';
+import { Conversation, ConversationSchema } from 'src/chat/schemas/conversation.schema';
 
 @Module({
   controllers: [WebhookController],
@@ -16,7 +17,8 @@ import { Channel, ChannelSchema } from 'src/whatsapp/schemas/channel.schema';
     ChatModule,
     MongooseModule.forFeature([
       { name: Template.name, schema: TemplateSchema },
-      { name: Channel.name, schema: ChannelSchema }
+      { name: Channel.name, schema: ChannelSchema },
+      { name: Conversation.name, schema: ConversationSchema },
     ])
   ],
   providers: [WebhookService]

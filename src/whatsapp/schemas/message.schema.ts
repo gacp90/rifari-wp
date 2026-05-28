@@ -16,30 +16,30 @@ export type MessageDocument = Message & Document;
 })
 export class Message {
   @Prop({ type: Types.ObjectId, ref: 'Channel', required: true, index: true })
-  channelId: Types.ObjectId; // Relación con el número del cliente
+  channelId!: Types.ObjectId; // Relación con el número del cliente
 
   @Prop({ required: true })
-  wamid: string;
+  wamid!: string;
   
   @Prop({ required: true })
-  internalApiKey: string; 
+  internalApiKey!: string; 
 
   @Prop({ required: true })
-  from: string; // Número del remitente
+  from!: string; // Número del remitente
 
   @Prop({ required: true })
-  to: string; // Número del destinatario
+  to!: string; // Número del destinatario
 
   @Prop({ required: true, enum: ['inbound', 'outbound'] })
-  direction: string; // Para saber si el cliente de la rifa envió el mensaje o lo recibió
+  direction!: string; // Para saber si el cliente de la rifa envió el mensaje o lo recibió
 
   @Prop({ required: true, enum: ['text', 'image', 'audio', 'video', 'document', 'sticker', 'template', 'button', 'interactive', 'reaction', 'unknown'] })
-  type: string;
+  type!: string;
 
   // Usamos tipo JSON/Object para el contenido, así podemos guardar texto plano, 
   // o metadatos de archivos (media_id, url) si es una imagen o nota de voz
   @Prop({ type: Object, required: true })
-  content: {
+  content!: {
     text?: string;
     mediaId?: string;
     mimeType?: string;
@@ -48,7 +48,7 @@ export class Message {
   };
 
   @Prop({ required: true, enum: ['sent', 'delivered', 'read', 'failed', 'received'] })
-  status: string; // El estado actual del mensaje
+  status!: string; // El estado actual del mensaje
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

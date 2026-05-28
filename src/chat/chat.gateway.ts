@@ -19,7 +19,7 @@ import { Logger } from '@nestjs/common';
   }
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  @WebSocketServer() server: Server;
+  @WebSocketServer() server!: Server;
   private logger = new Logger('ChatGateway');
 
   handleConnection(client: Socket) {

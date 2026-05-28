@@ -124,7 +124,7 @@ export class ChatService {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to: to,
-      type: metaType,
+      type: finalMimeType,
     };
 
     if (metaType === 'image') metaPayload.image = { link: publicUrl };

@@ -120,6 +120,7 @@ export class ChatService {
     const publicUrl = `https://${bucketName}.${process.env.DO_SPACES_REGION}.digitaloceanspaces.com/${s3Key}`;
 
     // 4. PREPARAR Y ENVIAR A META
+    // 4. PREPARAR Y ENVIAR A META
     const metaPayload: any = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -127,24 +128,56 @@ export class ChatService {
       type: metaType,
     };
 
-    if (metaType === 'image') metaPayload.image = { link: publicUrl };
-    else if (metaType === 'audio') metaPayload.audio = { link: publicUrl };
-    else if (metaType === 'video') metaPayload.video = { link: publicUrl };
-    else metaPayload.document = { link: publicUrl, filename: file.originalname };
+    if (metaType === 'image') {
+      metaPayload.image = { link: publicUrl };
+    } else if (metaType === 'video') {
+      metaPayload.video = { link: publicUrl };
+    } else if (metaType === 'document') {
+      metaPayload.document = { link: publicUrl, filename: file.originalname };
+    } else if (metaType === 'audio') {
+      // ⚠️ LA MAGIA PARA LAS NOTAS DE VOZ: Subir por ID, no por Link
+      this.logger.log('Subiendo nota de voz directo a los servidores de Meta...');
+      
+      const form = new FormData();
+      const blob = new Blob([new Uint8Array(finalBuffer)], { type: 'audio/ogg' });
+      form.append('messaging_product', 'whatsapp');
+      form.append('file', blob, 'voice.ogg');
+      
+      try {
+        const uploadRes = await fetch(`https://graph.facebook.com/v25.0/${channel.phoneNumberId}/media`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${channel.access_token}` },
+          body: form
+        });
+        
+        const uploadData = await uploadRes.json();
+        
+        if (uploadData.error) {
+          throw new Error(uploadData.error.message);
+        }
+        
+        // Meta nos devuelve un ID, lo usamos en lugar del link
+        metaPayload.audio = { id: uploadData.id };
+        this.logger.log(`Audio subido a Meta con éxito. ID: ${uploadData.id}`);
+
+      } catch (err) {
+        this.logger.error('Error subiendo audio a Meta:', err);
+        throw new BadRequestException('Fallo al subir la nota de voz a WhatsApp');
+      }
+    }
 
     let wamid = '';
-    this.logger.log(`🔗 URL a enviar a Meta: ${publicUrl}`);
-    this.logger.log(`📦 Payload completo: ${JSON.stringify(metaPayload, null, 2)}`);
+    this.logger.log(`📦 Payload a enviar: ${JSON.stringify(metaPayload, null, 2)}`);
     try {
       const response = await axios.post(
         `https://graph.facebook.com/v25.0/${channel.phoneNumberId}/messages`,
         metaPayload,
-        { headers: { Authorization: `Bearer ${internalApiKey}` } }
+        { headers: { Authorization: `Bearer ${channel.access_token}` } } // Ojo: Usar el token del canal
       );
       wamid = response.data.messages[0].id;
     } catch (error: any) {
       this.logger.error('Error de Meta API:', error.response?.data || error.message);
-      throw new BadRequestException('WhatsApp rechazó el archivo multimedia');
+      throw new BadRequestException('WhatsApp rechazó el mensaje multimedia');
     }
 
     // 5. ACTUALIZAR BASE DE DATOS (Nuestra lógica dual de chat)

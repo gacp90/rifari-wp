@@ -5,12 +5,14 @@ import { ChatGateway } from './chat.gateway';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Message, MessageSchema } from 'src/whatsapp/schemas/message.schema';
 import { Conversation, ConversationSchema } from './schemas/conversation.schema';
+import { Channel, ChannelSchema } from 'src/whatsapp/schemas/channel.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Message.name, schema: MessageSchema },
-      { name: Conversation.name, schema: ConversationSchema }
+      { name: Conversation.name, schema: ConversationSchema },
+      { name: Channel.name, schema: ChannelSchema },
     ])
   ],
   controllers: [ChatController],

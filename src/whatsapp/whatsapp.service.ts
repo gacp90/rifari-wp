@@ -198,6 +198,6 @@ export class WhatsappService {
       console.error('Error al sincronizar estado de Meta:', error);
       throw new InternalServerErrorException({ok: false, msg:'No se pudo obtener el estado de Meta'});
     }
-}
+  }
 
 }

@@ -158,7 +158,7 @@ export class ChatService {
       type: metaType,
       content: {
         mediaId: fileName,
-        mimeType: finalMimeType,
+        mimeType: metaType,
         fileName: publicUrl, // Para que el frontend lo pinte al instante
         caption: file.originalname
       },

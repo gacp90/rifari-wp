@@ -133,11 +133,13 @@ export class ChatService {
     else metaPayload.document = { link: publicUrl, filename: file.originalname };
 
     let wamid = '';
+    this.logger.log(`🔗 URL a enviar a Meta: ${publicUrl}`);
+    this.logger.log(`📦 Payload completo: ${JSON.stringify(metaPayload, null, 2)}`);
     try {
       const response = await axios.post(
         `https://graph.facebook.com/v25.0/${channel.phoneNumberId}/messages`,
         metaPayload,
-        { headers: { Authorization: `Bearer ${channel.access_token}` } }
+        { headers: { Authorization: `Bearer ${internalApiKey}` } }
       );
       wamid = response.data.messages[0].id;
     } catch (error: any) {

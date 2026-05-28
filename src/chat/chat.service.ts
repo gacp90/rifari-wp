@@ -17,6 +17,8 @@ import * as path from 'path';
 import * as os from 'os';
 import ffmpeg from 'fluent-ffmpeg';
 
+import FormData from 'form-data';
+
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
@@ -135,33 +137,36 @@ export class ChatService {
     } else if (metaType === 'document') {
       metaPayload.document = { link: publicUrl, filename: file.originalname };
     } else if (metaType === 'audio') {
-      // ⚠️ LA MAGIA PARA LAS NOTAS DE VOZ: Subir por ID, no por Link
       this.logger.log('Subiendo nota de voz directo a los servidores de Meta...');
       
       const form = new FormData();
-      const blob = new Blob([new Uint8Array(finalBuffer)], { type: 'audio/ogg' });
       form.append('messaging_product', 'whatsapp');
-      form.append('file', blob, 'voice.ogg');
+      
+      // En Node.js, para subir un Buffer en FormData, DEBES especificar el filename y contentType
+      form.append('file', finalBuffer, {
+        filename: 'voice.ogg',
+        contentType: 'audio/ogg' // Aquí no pongas "codecs=opus", Meta lee el códec desde adentro del archivo
+      });
       
       try {
-        const uploadRes = await fetch(`https://graph.facebook.com/v25.0/${channel.phoneNumberId}/media`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${channel.access_token}` },
-          body: form
-        });
+        // Usamos axios y le inyectamos los headers de FormData para que calcule el Boundary
+        const uploadRes = await axios.post(
+          `https://graph.facebook.com/v25.0/${channel.phoneNumberId}/media`,
+          form,
+          {
+            headers: {
+              ...form.getHeaders(), // ⚠️ ESTO ES VITAL EN NODE.JS
+              Authorization: `Bearer ${channel.access_token}`
+            }
+          }
+        );
         
-        const uploadData = await uploadRes.json();
-        
-        if (uploadData.error) {
-          throw new Error(uploadData.error.message);
-        }
-        
-        // Meta nos devuelve un ID, lo usamos en lugar del link
-        metaPayload.audio = { id: uploadData.id };
-        this.logger.log(`Audio subido a Meta con éxito. ID: ${uploadData.id}`);
+        const mediaId = uploadRes.data.id;
+        metaPayload.audio = { id: mediaId };
+        this.logger.log(`✅ Audio subido a Meta con éxito. ID: ${mediaId}`);
 
-      } catch (err) {
-        this.logger.error('Error subiendo audio a Meta:', err);
+      } catch (err: any) {
+        this.logger.error('❌ Error subiendo audio a Meta:', err.response?.data || err.message);
         throw new BadRequestException('Fallo al subir la nota de voz a WhatsApp');
       }
     }

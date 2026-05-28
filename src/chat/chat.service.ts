@@ -93,7 +93,7 @@ export class ChatService {
     } else if (metaType === 'audio') {
       this.logger.log(`Convirtiendo nota de voz a OGG Opus...`);
       finalBuffer = await this.convertToWhatsAppAudio(file.buffer);
-      finalMimeType = 'audio/ogg';
+      finalMimeType = 'audio/ogg; codecs=opus';
       extension = 'ogg';
     }
 

@@ -10,7 +10,10 @@ export class Conversation extends Document {
   channelId!: string;
 
   @Prop({ required: true, index: true })
-  customerPhone!: string; // El número del cliente final
+  customerPhone!: string; // El número del cliente final customerName
+
+  @Prop()
+  customerName!: string;
 
   @Prop({ type: Object, required: true })
   lastMessage!: {

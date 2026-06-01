@@ -307,7 +307,7 @@ export class WhatsappController {
                 successCount++;
 
                 // Pausa de 100ms para cuidar el Rate Limit de Meta
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 250));
 
             } catch (error: any) {
                 failCount++;

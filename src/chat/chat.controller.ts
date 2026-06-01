@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Headers, UnauthorizedException, Post, UseInterceptors, Body, UploadedFile, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Query, Headers, UnauthorizedException, Post, UseInterceptors, Body, UploadedFile, HttpException, HttpStatus, Put, BadRequestException } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -51,5 +51,20 @@ export class ChatController {
     } catch (error: any) {
       throw new HttpException({ok: false, msg: error.message}, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  @Put('conversation/name')
+  async updateCustomerName(
+    @Headers('x-api-key') internalApiKey: string,
+    @Body('customerPhone') customerPhone: string,
+    @Body('newName') newName: string
+  ) {
+    // 1. Validación rápida de entrada
+    if (!internalApiKey || !customerPhone || !newName) {
+      throw new BadRequestException({ok: false, msg:'Faltan parámetros requeridos '});
+    }
+
+    // 2. Delegamos al servicio
+    return await this.chatService.updateCustomerName(internalApiKey, customerPhone, newName);
   }
 }

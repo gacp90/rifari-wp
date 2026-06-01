@@ -279,4 +279,33 @@ export class ChatService {
       } catch (e) {}
     }
   }
+
+  async updateCustomerName(internalApiKey: string, customerPhone: string, newName: string) {
+    try {
+      const updatedConversation = await this.conversationModel.findOneAndUpdate(
+        { internalApiKey: internalApiKey, customerPhone: customerPhone },
+        { $set: { customerName: newName } },
+        { new: true } // Esto asegura que Mongoose nos devuelva el documento ya actualizado
+      );
+
+      // Si no encontró el documento, lanzamos un 404
+      if (!updatedConversation) {
+        throw new NotFoundException({ok: false, msg: 'Conversación no encontrada para este cliente.'});
+      }
+
+      return { 
+        success: true, 
+        message: 'Nombre actualizado correctamente',
+        data: {
+          customerPhone: updatedConversation.customerPhone,
+          customerName: updatedConversation.customerName
+        }
+      };
+    } catch (error: any) {
+      this.logger.error('Error al actualizar el nombre del cliente:', error);
+      // Si el error ya es una excepción de Nest (como el NotFound), lo dejamos pasar
+      if (error.status) throw error;
+      throw new BadRequestException('No se pudo actualizar el nombre del cliente en la base de datos.');
+    }
+  }
 }

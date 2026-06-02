@@ -145,7 +145,7 @@ export class ChatService {
       // En Node.js, para subir un Buffer en FormData, DEBES especificar el filename y contentType
       form.append('file', finalBuffer, {
         filename: 'voice.ogg',
-        contentType: 'audio/ogg' // Aquí no pongas "codecs=opus", Meta lee el códec desde adentro del archivo
+        contentType: 'audio/ogg; codecs=opus'
       });
       
       try {
@@ -255,13 +255,32 @@ export class ChatService {
       ffmpeg(tempInputPath)
         .toFormat('ogg')
         .audioCodec('libopus')
+        // ==========================================
+        // ⚠️ REGLAS ESTRICTAS DE META PARA NOTAS DE VOZ
+        // ==========================================
+        .audioBitrate('16k')      // Calidad para voz
+        .audioChannels(1)         // OBLIGATORIO: Mono (1 solo canal)
+        .audioFrequency(16000)    // OBLIGATORIO: Frecuencia de voz
+        .outputOptions([
+          '-map_metadata', '-1',  // OBLIGATORIO: Elimina el "título/artista"
+          '-avoid_negative_ts', 'make_zero' // Evita errores de duración en el navegador
+        ])
         .on('error', async (err) => {
           await this.cleanUpTempFiles([tempInputPath, tempOutputPath]);
           reject(new Error(`Error en FFmpeg: ${err.message}`));
         })
         .on('end', async () => {
           try {
+            // 🛡️ ESCUDO: Esperamos 100ms para que el SO suelte el archivo completamente
+            await new Promise(r => setTimeout(r, 100)); 
+            
             const outputBuffer = await fs.readFile(tempOutputPath);
+            
+            // Validar que el archivo se procesó
+            if (outputBuffer.length === 0) {
+               throw new Error('El buffer generado por FFmpeg está vacío');
+            }
+
             await this.cleanUpTempFiles([tempInputPath, tempOutputPath]);
             resolve(outputBuffer);
           } catch (e) {

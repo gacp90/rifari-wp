@@ -295,7 +295,7 @@ export class ChatService {
 
       return { 
         success: true, 
-        message: 'Nombre actualizado correctamente',
+        msg: 'Nombre actualizado correctamente',
         data: {
           customerPhone: updatedConversation.customerPhone,
           customerName: updatedConversation.customerName

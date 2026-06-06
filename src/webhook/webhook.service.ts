@@ -91,7 +91,7 @@ export class WebhookService {
       }
 
       // ====================================================
-      // 2. RUTA DE MENSAJES (Tu lógica original intacta)
+      // 3. RUTA DE MENSAJES (Tu lógica original intacta)
       // ====================================================
       if (field === 'messages') {
         const destinationPhoneId = value.metadata?.phone_number_id;
@@ -111,6 +111,42 @@ export class WebhookService {
           const statusMsg = value.statuses[0];
           await this.updateMessageStatus(statusMsg);
         }
+      }
+
+      // ====================================================
+      // 4. RUTA DE ACTUALIZACIÓN DE LÍMITES (CAPABILITY UPDATE)
+      // ====================================================
+      if (field === 'business_capability_update') {
+        const phoneNumber = value.display_phone_number;
+        const wabaLimit = value.max_daily_conversations_per_business;
+        const phoneLimit = value.max_daily_conversation_per_phone;
+
+        this.logger.log(`[Webhook] Límites actualizados para ${phoneNumber} | WABA: ${wabaLimit} | Phone: ${phoneLimit}`);
+
+        // Buscamos el canal específico dentro de ese WABA
+        const channel = await this.channelModel.findOne({ 
+          wabaId: wabaId, 
+          displayPhoneNumber: phoneNumber 
+        });
+
+        if (channel) {
+          // Actualizamos la base de datos usando la nomenclatura de la API
+          // para que el frontend siga funcionando sin modificaciones.
+          await this.channelModel.updateOne(
+            { _id: channel._id },
+            { 
+              $set: { 
+                whatsapp_business_manager_messaging_limit: wabaLimit,
+                messaging_limit_tier: phoneLimit 
+              } 
+            }
+          );
+          this.logger.log(`[Webhook] Límites guardados en BD para el canal de ${phoneNumber}.`);
+        } else {
+          this.logger.warn(`[Webhook] Canal no encontrado para el número ${phoneNumber} al actualizar límites.`);
+        }
+        
+        return; // Terminamos aquí para no continuar con las demás rutas
       }
 
     } catch (error) {

@@ -49,7 +49,13 @@ export class Channel {
   lastMessageDate!: Date;
 
   @Prop({default: 0})
-  dailyMessagesSent!: number;
+  dailyMessagesSent!: number;  
+
+  @Prop({ required: false })
+  whatsapp_business_manager_messaging_limit?: string;
+
+  @Prop({ required: false })
+  messaging_limit_tier?: string;
 
   @Prop({default: 250})
   messagingLimit!: number;

@@ -53,9 +53,13 @@ export class Channel {
 
   @Prop({ required: false })
   whatsapp_business_manager_messaging_limit?: string;
+  
+  @Prop({ required: false })
+  max_allowed_phones?: number;
 
   @Prop({ required: false })
   messaging_limit_tier?: string;
+
 
   @Prop({default: 250})
   messagingLimit!: number;

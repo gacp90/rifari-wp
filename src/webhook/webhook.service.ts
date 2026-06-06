@@ -117,36 +117,38 @@ export class WebhookService {
       // 4. RUTA DE ACTUALIZACIÓN DE LÍMITES (CAPABILITY UPDATE)
       // ====================================================
       if (field === 'business_capability_update') {
-        const phoneNumber = value.display_phone_number;
-        const wabaLimit = value.max_daily_conversations_per_business;
-        const phoneLimit = value.max_daily_conversation_per_phone;
+        // En este webhook ya NO viene el número de teléfono (display_phone_number no está en el payload oficial)
+        // Todo se maneja a nivel de WABA (La cuenta comercial).
 
-        this.logger.log(`[Webhook] Límites actualizados para ${phoneNumber} | WABA: ${wabaLimit} | Phone: ${phoneLimit}`);
+        const wabaLimitRaw = value.max_daily_conversations_per_business;
+        const wabaLimit = wabaLimitRaw ? String(wabaLimitRaw) : 'TIER_250';
+        
+        // Atrapamos el límite de números permitidos (dependiendo del tier)
+        const maxPhones = Number(value.max_phone_numbers_per_waba || value.max_phone_numbers_per_business || 0);
 
-        // Buscamos el canal específico dentro de ese WABA
-        const channel = await this.channelModel.findOne({ 
-          wabaId: wabaId, 
-          displayPhoneNumber: phoneNumber 
-        });
+        this.logger.log(`[Webhook] Capacidad de negocio actualizada para el WABA ${wabaId} | Límite: ${wabaLimit} | Max Teléfonos: ${maxPhones}`);
 
-        if (channel) {
-          // Actualizamos la base de datos usando la nomenclatura de la API
-          // para que el frontend siga funcionando sin modificaciones.
-          await this.channelModel.updateOne(
-            { _id: channel._id },
+        // Buscamos TODOS los canales (teléfonos) que pertenezcan a este cliente (WABA)
+        const channels = await this.channelModel.find({ wabaId: wabaId });
+
+        if (channels.length > 0) {
+          // Actualizamos la base de datos masivamente para todos los números de ese cliente
+          // Usamos la nomenclatura de la API para que Angular lo lea correctamente
+          await this.channelModel.updateMany(
+            { wabaId: wabaId },
             { 
               $set: { 
                 whatsapp_business_manager_messaging_limit: wabaLimit,
-                messaging_limit_tier: phoneLimit 
+                max_allowed_phones: maxPhones // Te sugiero guardar esto para tu panel administrativo
               } 
             }
           );
-          this.logger.log(`[Webhook] Límites guardados en BD para el canal de ${phoneNumber}.`);
+          this.logger.log(`[Webhook] Límites guardados masivamente en BD para ${channels.length} canales del WABA ${wabaId}.`);
         } else {
-          this.logger.warn(`[Webhook] Canal no encontrado para el número ${phoneNumber} al actualizar límites.`);
+          this.logger.warn(`[Webhook] No se encontraron canales registrados para el WABA ID: ${wabaId}.`);
         }
         
-        return; // Terminamos aquí para no continuar con las demás rutas
+        return; 
       }
 
     } catch (error) {

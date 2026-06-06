@@ -249,11 +249,59 @@ export class WebhookService {
   }
 
   private async updateMessageStatus(statusMsg: any) {
-    await this.messageModel.findOneAndUpdate(
-      { wamid: statusMsg.id },
-      { status: statusMsg.status }
-    );
-    this.logger.debug(`📊 Estado actualizado: ${statusMsg.id} -> ${statusMsg.status}`);
+    try {
+      const wamid = statusMsg.id;
+      const nuevoStatus = statusMsg.status;
+
+      // 1. RUTA DE ERROR ASINCRÓNICO (Meta destruyó el mensaje después de recibirlo)
+      if (nuevoStatus === 'failed') {
+        const error = statusMsg.errors?.[0];
+        const errorCode = error?.code;
+        const errorDetail = error?.title || error?.details || 'Error desconocido';
+
+        this.logger.error(`❌ Fallo asincrónico en Meta. WAMID: ${wamid} | Código: ${errorCode} | Motivo: ${errorDetail}`);
+
+        // Buscamos el mensaje original en la BD para recuperar el costo y el canal
+        const mensajeOriginal = await this.messageModel.findOne({ wamid: wamid });
+
+        // Escudo: Solo reembolsamos si el mensaje existe y su estado previo NO era 'failed'
+        if (mensajeOriginal && mensajeOriginal.status !== 'failed') {
+          const costoAAnular = mensajeOriginal.cost || 0;
+
+          if (costoAAnular > 0) {
+            // Devolvemos el dinero al balance del canal usando el channelId guardado
+            await this.channelModel.updateOne(
+              { _id: mensajeOriginal.channelId },
+              { $inc: { amount: costoAAnular } }
+            );
+            this.logger.log(`💰 [Reembolso] +${costoAAnular} créditos devueltos al canal por error ${errorCode}.`);
+          }
+        }
+
+        // Actualizamos el registro del mensaje con el estado fallido y sus motivos
+        await this.messageModel.updateOne(
+          { wamid: wamid },
+          { 
+            $set: { 
+              status: 'failed',
+              errorCode: errorCode,
+              errorDetail: errorDetail
+            } 
+          }
+        );
+
+      } else {
+        // 2. RUTA NORMAL (Entregado, Leído, etc.)
+        await this.messageModel.updateOne(
+          { wamid: wamid },
+          { $set: { status: nuevoStatus } }
+        );
+        this.logger.debug(`📊 Estado actualizado: ${wamid} -> ${nuevoStatus}`);
+      }
+
+    } catch (error: any) {
+      this.logger.error(`Error crítico en updateMessageStatus: ${error.message}`);
+    }
   }
 
   // Tu función mejorada para detectar mediaId

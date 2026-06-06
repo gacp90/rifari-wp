@@ -49,6 +49,15 @@ export class Message {
 
   @Prop({ required: true, enum: ['sent', 'delivered', 'read', 'failed', 'received'] })
   status!: string; // El estado actual del mensaje
+
+  @Prop({ required: false })
+  errorCode?: number;
+
+  @Prop({ required: false })
+  errorDetail?: string;
+
+  @Prop({ required: false, default: 0 })
+  cost?: number;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

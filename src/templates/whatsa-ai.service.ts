@@ -67,7 +67,7 @@ export class WhatsappAiService {
       while (intentos > 0) {
         try {
           response = await this.ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3.7-flash',
             contents: contents,
             config: {
             systemInstruction: `Eres un auditor automatizado y MULTIMODAL para las Políticas de Comercio de Meta.

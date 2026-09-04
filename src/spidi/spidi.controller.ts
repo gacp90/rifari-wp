@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Headers, ServiceUnavailableException } from '@nestjs/common';
 import { SpidiService } from './spidi.service';
 import { CreateSpidiDto } from './dto/create-spidi.dto';
 import { UpdateSpidiDto } from './dto/update-spidi.dto';
@@ -17,6 +17,11 @@ export class SpidiController {
     @Body('link') link: string,
     @Body('usuario') usuario: string
   ) {
+
+    throw new ServiceUnavailableException({
+      ok: false, 
+      message: 'Plataforma de pagos automáticos en mantenimiento. Por favor, comunícate con soporte para realizar tu recarga manualmente a través de Binance (USDT).'
+    });
     
     const apiKey = req.headers['x-api-key'];
     return this.spidiService.generateCheckoutLink(apiKey, creditos, link, usuario);

@@ -47,12 +47,6 @@ export class SpidiService {
     
     const channel = await this.channelModel.findOne({ internalApiKey: apiKey });
     if (!channel) throw new NotFoundException('Canal no encontrado');
-
-    throw new ServiceUnavailableException({
-      ok: false, 
-      message: 'Plataforma de pagos automáticos en mantenimiento. Por favor, comunícate con soporte para realizar tu recarga manualmente a través de Binance (USDT).'
-    });
-
     const token = await this.getSpidiToken();
 
     // Aquí haces el fetch a la API de Spidi para crear el link

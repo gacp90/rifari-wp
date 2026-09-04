@@ -20,7 +20,7 @@ export class SpidiController {
 
     throw new ServiceUnavailableException({
       ok: false, 
-      message: 'Plataforma de pagos automáticos en mantenimiento. Por favor, comunícate con soporte para realizar tu recarga manualmente a través de Binance (USDT).'
+      msg: 'Plataforma de pagos automáticos en mantenimiento. Por favor, comunícate con soporte para realizar tu recarga manualmente a través de Binance (USDT).'
     });
     
     const apiKey = req.headers['x-api-key'];

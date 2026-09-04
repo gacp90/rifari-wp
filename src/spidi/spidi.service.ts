@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { CreateSpidiDto } from './dto/create-spidi.dto';
 import { UpdateSpidiDto } from './dto/update-spidi.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -43,8 +43,16 @@ export class SpidiService {
 
   // Función 1: Crea la intención de pago cuando Angular lo solicita
   async generateCheckoutLink(apiKey: string, creditosComprados: number, link: string, usuario: string) {
+
+    
     const channel = await this.channelModel.findOne({ internalApiKey: apiKey });
     if (!channel) throw new NotFoundException('Canal no encontrado');
+
+    throw new ServiceUnavailableException({
+      ok: false, 
+      message: 'Plataforma de pagos automáticos en mantenimiento. Por favor, comunícate con soporte para realizar tu recarga manualmente a través de Binance (USDT).'
+    });
+
     const token = await this.getSpidiToken();
 
     // Aquí haces el fetch a la API de Spidi para crear el link
